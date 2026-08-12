@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Focus Guard — Prototype</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#08080C;--surface:#111116;--card:#18181E;--card2:#202028;
+  --border:#2A2A32;--accent:#FF5500;--accent-dim:rgba(255,85,0,.13);
+  --red:#FF3B30;--blue:#0A84FF;--blue-glow:rgba(10,132,255,.5);
+  --green:#30D158;--yellow:#FFD60A;
+  --text:#F2F2F7;--text2:#8E8E93;--text3:#48484A;
+}
+body{
+  background:var(--bg);
+  background-image:radial-gradient(ellipse at 50% 30%,rgba(255,85,0,.05) 0%,transparent 55%);
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  overflow:hidden;
+}
+
+.scene{display:flex;align-items:center;justify-content:center;gap:24px;
+  height:100vh;width:100vw;padding:16px;}
+
+.ctrl-panel{display:flex;flex-direction:column;gap:10px;flex-shrink:0;min-width:118px;}
+.ctrl-label{font-size:10px;letter-spacing:1px;text-transform:uppercase;
+  color:var(--text3);padding:0 4px;margin-bottom:2px;}
+.ctrl-btn{
+  background:var(--card);border:1px solid var(--border);color:var(--text2);
+  padding:9px 14px;border-radius:10px;cursor:pointer;font-size:12px;
+  font-weight:500;transition:all .2s;white-space:nowrap;font-family:inherit;text-align:left;
+}
+.ctrl-btn:hover{background:var(--card2);border-color:var(--accent);color:var(--accent);}
+.ctrl-btn.danger{border-color:var(--red);color:var(--red);}
+.ctrl-btn.danger:hover{background:rgba(255,59,48,.12);}
+.ctrl-btn.warn{border-color:var(--yellow);color:var(--yellow);}
+.ctrl-btn.warn:hover{background:rgba(255,214,10,.1);}
+
+#phoneWrap{position:relative;flex-shrink:0;}
+
+.phone{
+  width:390px;height:844px;
+  background:linear-gradient(160deg,#1E1E24 0%,#141418 100%);
+  border-radius:54px;border:1.5px solid #2E2E38;position:relative;overflow:hidden;
+  box-shadow:0 0 0 1px #08080C,0 50px 100px rgba(0,0,0,.9),
+    inset 0 1px 0 rgba(255,255,255,.07),inset 0 -1px 0 rgba(0,0,0,.5);
+  transition:width .45s ease,height .45s ease,border-radius .45s ease;
+}
+.phone::before{content:'';position:absolute;left:-3px;top:130px;width:3px;height:30px;
+  background:#252530;border-radius:2px;box-shadow:0 42px 0 #252530,0 84px 0 #252530;}
+.phone::after{content:'';position:absolute;right:-3px;top:170px;width:3px;height:56px;
+  background:#252530;border-radius:2px;}
+
+.phone-notch{
+  position:absolute;top:12px;left:50%;transform:translateX(-50%);
+  width:118px;height:34px;background:#000;border-radius:20px;z-index:100;
+  transition:all .45s ease;
+}
+.status-bar{
+  position:absolute;top:0;left:0;right:0;height:54px;z-index:99;
+  display:flex;align-items:flex-end;justify-content:space-between;
+  padding:0 26px 8px;color:var(--text);font-size:12px;font-weight:600;
+  transition:all .45s;
+}
+.status-icons{display:flex;gap:4px;align-items:center;font-size:11px;}
+.app-screen{position:absolute;top:0;left:0;right:0;bottom:0;background:var(--bg);overflow:hidden;}
+.phone-bar{
+  position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+  width:130px;height:5px;background:rgba(255,255,255,.25);border-radius:3px;z-index:100;
+  transition:all .45s ease;
+}
+
+.screen{
+  position:absolute;top:0;left:0;right:0;bottom:0;
+  padding-top:54px;padding-bottom:28px;
+  display:none;flex-direction:column;background:var(--bg);overflow:hidden;
+}
+.screen.active{display:flex;}
+.screen.scrollable{overflow-y:auto;}
+.screen::-webkit-scrollbar{width:0;}
+
+/* HOME */
+#screen-home{align-items:center;overflow-y:auto;}
+.home-wrap{display:flex;flex-direction:column;align-items:center;width:100%;margin:auto;}
+.home-header{
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+  padding:0 32px 32px;
+  transform:translateY(170px);opacity:0;
+}
+.home-header.done{
+  transform:translateY(0);opacity:1;
+  transition:transform .8s cubic-bezier(.34,1.56,.64,1),opacity .5s ease;
+}
+.home-logo{
+  width:66px;height:66px;background:var(--accent-dim);border:2px solid var(--accent);
+  border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:32px;
+  box-shadow:0 0 24px rgba(255,85,0,.2);
+}
+.home-title{font-size:30px;font-weight:900;color:var(--accent);letter-spacing:-.5px;}
+.home-sub{font-size:13px;color:var(--text2);}
+.home-btns{
+  display:flex;flex-direction:column;gap:12px;width:100%;padding:0 32px;
+  opacity:0;transform:translateY(14px);
+}
+.home-btns.done{
+  opacity:1;transform:translateY(0);
+  transition:opacity .5s ease .6s,transform .5s ease .6s;
+}
+
+.btn-primary{
+  background:var(--accent);color:#fff;border:none;padding:15px;
+  border-radius:16px;font-size:15px;font-weight:700;cursor:pointer;
+  transition:all .2s;font-family:inherit;
+  box-shadow:0 4px 16px rgba(255,85,0,.3);
+}
+.btn-primary:hover{opacity:.88;transform:scale(.98);}
+.btn-primary:active{transform:scale(.95);}
+.btn-secondary{
+  background:var(--card);color:var(--text);border:1px solid var(--border);
+  padding:13px;border-radius:16px;font-size:14px;font-weight:600;cursor:pointer;
+  transition:all .2s;font-family:inherit;
+}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+
+.s-header{display:flex;align-items:center;padding:12px 16px 6px;gap:8px;flex-shrink:0;}
+.back-btn{background:none;border:none;color:var(--accent);font-size:28px;cursor:pointer;padding:2px 8px;line-height:1;font-family:inherit;}
+.s-title{font-size:20px;font-weight:700;color:var(--text);}
+
+/* FORM */
+.form-body{padding:10px 18px;display:flex;flex-direction:column;gap:14px;flex:1;overflow-y:auto;overflow-x:hidden;}
+.form-body::-webkit-scrollbar{width:0;}
+.form-group{display:flex;flex-direction:column;gap:6px;}
+.form-label{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;}
+.form-input{
+  background:var(--card);border:1px solid var(--border);color:var(--text);
+  padding:11px 14px;border-radius:12px;font-size:15px;width:100%;outline:none;
+  transition:border-color .2s;font-family:inherit;
+}
+.form-input:focus{border-color:var(--accent);}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.time-preview{
+  background:var(--accent-dim);border:1px solid rgba(255,85,0,.25);
+  border-radius:12px;padding:11px 14px;font-size:12px;color:var(--text2);line-height:1.7;
+}
+.time-preview strong{color:var(--accent);}
+.form-actions{display:flex;gap:12px;padding:12px 18px 6px;flex-shrink:0;}
+.form-actions .btn-primary,.form-actions .btn-secondary{flex:1;}
+
+/* SESSION CARDS */
+.sessions-list{padding:10px 14px;display:flex;flex-direction:column;gap:10px;}
+.scard{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;cursor:pointer;transition:all .2s;}
+.scard:hover{border-color:var(--accent);background:var(--card2);}
+.scard-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px;}
+.scard-name{font-size:15px;font-weight:700;color:var(--text);}
+.scard-badge{background:var(--accent-dim);color:var(--accent);font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;flex-shrink:0;}
+.scard-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.detail{display:flex;flex-direction:column;gap:2px;}
+.detail-lbl{font-size:10px;color:var(--text2);}
+.detail-val{font-size:13px;font-weight:600;color:var(--text);}
+
+/* PREV CARDS */
+.prev-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;cursor:pointer;transition:all .2s;}
+.prev-card:hover{border-color:var(--accent);}
+.prev-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;gap:8px;}
+.score-badge{font-size:22px;font-weight:900;flex-shrink:0;}
+.prev-footer{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);}
+
+/* SESSION SCREEN */
+#screen-session{justify-content:space-between;align-items:center;padding-top:54px;padding-bottom:12px;}
+.sess-top{display:flex;justify-content:space-between;align-items:flex-start;width:100%;padding:8px 22px 0;}
+.sess-meta-label{font-size:11px;color:var(--text2);}
+.sess-meta-val{font-size:14px;font-weight:700;color:var(--text);margin-top:2px;}
+.sess-mid{display:flex;flex-direction:column;align-items:center;gap:22px;width:100%;}
+
+.circle-wrap{position:relative;width:224px;height:224px;flex-shrink:0;}
+.prog-svg{width:224px;height:224px;transform:rotate(-90deg);transform-origin:center;}
+.prog-track{fill:none;stroke:var(--card2);stroke-width:9;}
+.prog-bar{
+  fill:none;stroke:var(--accent);stroke-width:9;stroke-linecap:round;
+  stroke-dasharray:659.73;stroke-dashoffset:659.73;
+  transition:stroke-dashoffset 1s linear,stroke .5s;
+}
+@keyframes glow{0%,100%{filter:drop-shadow(0 0 8px rgba(10,132,255,.6))}50%{filter:drop-shadow(0 0 20px rgba(10,132,255,.9));}}
+.prog-bar.over{stroke:var(--blue);animation:glow 2s ease-in-out infinite;}
+.sw-display{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;}
+.sw-time{font-size:34px;font-weight:900;color:var(--text);font-variant-numeric:tabular-nums;letter-spacing:-1px;transition:color .5s;}
+.sw-time.over{color:var(--blue);}
+.sw-status{font-size:11px;color:var(--text2);margin-top:3px;}
+
+.pause-info{text-align:center;}
+.pause-lbl{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;}
+.pause-val{font-size:22px;font-weight:700;color:var(--text);margin-top:4px;font-variant-numeric:tabular-nums;transition:color .3s;}
+.pause-val.on{color:var(--blue);}
+
+.sess-btns{display:flex;gap:12px;padding:0 22px;width:100%;}
+.btn-pause{flex:1;background:var(--card);border:1px solid var(--border);color:var(--text);padding:13px;border-radius:14px;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;font-family:inherit;}
+.btn-pause:hover{border-color:var(--blue);color:var(--blue);}
+.btn-pause.on{background:rgba(10,132,255,.12);border-color:var(--blue);color:var(--blue);}
+.btn-end{flex:1;background:rgba(255,59,48,.1);border:1px solid var(--red);color:var(--red);padding:13px;border-radius:14px;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;font-family:inherit;}
+.btn-end:hover{background:rgba(255,59,48,.2);}
+
+/* MODALS */
+.overlay{
+  position:absolute;top:0;left:0;right:0;bottom:0;
+  background:rgba(0,0,0,.78);backdrop-filter:blur(5px);
+  z-index:200;display:none;align-items:center;justify-content:center;padding:18px;
+}
+.overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:22px;width:100%;max-height:90%;overflow-y:auto;}
+.modal::-webkit-scrollbar{width:0;}
+.modal-title{font-size:17px;font-weight:800;color:var(--text);margin-bottom:14px;}
+.modal-body{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:16px;}
+.modal-row{display:flex;gap:10px;margin-top:14px;}
+.mbtn{flex:1;padding:11px;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:all .2s;font-family:inherit;}
+.mbtn.primary{background:var(--accent);color:#fff;}
+.mbtn.secondary{background:var(--card);color:var(--text2);}
+.mbtn.danger{background:rgba(255,59,48,.12);color:var(--red);border:1px solid var(--red);}
+.mbtn:hover{opacity:.85;}
+.conflict-msg{color:var(--red);font-size:12px;margin-bottom:8px;display:none;}
+.mini-sess{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-bottom:6px;font-size:12px;display:flex;justify-content:space-between;gap:8px;}
+.mini-sess-name{font-weight:600;color:var(--text);}
+.mini-sess-date{color:var(--text2);}
+
+/* PAUSE LOG */
+.pause-log-item{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:11px 13px;margin-bottom:8px;}
+.pause-log-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;}
+.p-status{font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;}
+.p-status.planned{background:rgba(48,209,88,.15);color:var(--green);}
+.p-status.unplanned{background:rgba(255,214,10,.15);color:var(--yellow);}
+.pause-log-detail{font-size:11px;color:var(--text2);margin-top:2px;}
+.pause-log-detail span{color:var(--text);}
+
+/* BIG WARNING */
+.big-warning{
+  position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.97);z-index:500;
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  gap:18px;padding:32px;cursor:pointer;
+}
+.big-warning.open{display:flex;}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08);}}
+.bw-icon{font-size:72px;animation:pulse 1.5s ease-in-out infinite;}
+.bw-text{font-size:28px;font-weight:900;color:var(--red);text-align:center;line-height:1.25;}
+.bw-sub{font-size:13px;color:var(--text2);}
+
+/* TOASTS */
+.toast-wrap{position:absolute;top:60px;left:10px;right:10px;z-index:400;display:flex;flex-direction:column;gap:7px;pointer-events:none;}
+.toast{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--yellow);border-radius:12px;padding:9px 12px;display:flex;align-items:center;gap:9px;pointer-events:all;}
+@keyframes tin{from{transform:translateY(-8px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes tout{from{opacity:1}to{transform:translateY(-8px);opacity:0}}
+.toast{animation:tin .25s ease forwards;}
+.toast.out{animation:tout .25s ease forwards;}
+.toast-icon{font-size:17px;}
+.toast-msg{font-size:11px;color:var(--text);flex:1;line-height:1.4;}
+.toast-x{background:none;border:none;color:var(--text2);cursor:pointer;font-size:14px;padding:0;}
+
+/* EMPTY */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;flex:1;padding:40px;}
+.empty-icon{font-size:38px;opacity:.3;}
+.empty-text{font-size:13px;color:var(--text2);text-align:center;}
+
+/* LANDSCAPE */
+.phone.land{width:844px;height:390px;border-radius:38px;}
+.phone.land .phone-notch{top:50%;left:10px;transform:translateY(-50%);width:32px;height:108px;border-radius:16px;}
+.phone.land .status-bar{flex-direction:column;justify-content:flex-start;align-items:flex-end;width:54px;height:100%;padding:55px 8px 20px;top:0;left:auto;right:0;}
+.phone.land .phone-bar{width:5px;height:90px;left:auto;right:8px;top:50%;transform:translateY(-50%);bottom:auto;}
+.phone.land .screen{padding-top:14px;padding-left:46px;padding-right:58px;padding-bottom:14px;}
+/* landscape session screen — shrink circle so everything fits */
+.phone.land #screen-session{overflow-y:auto;}
+.phone.land .circle-wrap{width:148px;height:148px;}
+.phone.land .prog-svg{width:148px;height:148px;}
+.phone.land .sw-time{font-size:22px;letter-spacing:-.5px;}
+.phone.land .sw-status{font-size:10px;}
+.phone.land .sess-mid{gap:12px;}
+.phone.land .pause-val{font-size:15px;margin-top:2px;}
+.phone.land .pause-lbl{font-size:10px;}
+.phone.land .sess-top{padding-top:2px;}
+.phone.land .sess-btns button{padding:10px;}
+/* landscape home — smaller initial animation offset + compact layout */
+.phone.land .home-header:not(.done){transform:translateY(60px);}
+.phone.land .home-header{padding-bottom:18px;}
+.phone.land .home-btns{gap:8px;}
+.phone.land .home-logo{width:50px;height:50px;font-size:24px;border-radius:14px;}
+.phone.land .home-title{font-size:22px;}
+</style>
+</head>
+<body>
+<div class="scene">
+
+  <!-- LEFT CONTROLS -->
+  <div class="ctrl-panel" style="align-items:flex-end">
+    <div class="ctrl-label">Prototype</div>
+    <button class="ctrl-btn" onclick="rotatePhone()">↺ &nbsp;Rotate Phone</button>
+    <button class="ctrl-btn" onclick="openModal('joinModal')" style="margin-top:8px">📅 Upcoming Session</button>
+  </div>
+
+  <!-- PHONE -->
+  <div id="phoneWrap">
+    <div class="phone" id="phone">
+      <div class="phone-notch"></div>
+      <div class="status-bar">
+        <span id="sbarTime">9:41</span>
+        <div class="status-icons"><span>●●●</span><span style="margin:0 3px">▲</span><span>⬛ 88%</span></div>
+      </div>
+
+      <div class="app-screen">
+
+        <!-- HOME -->
+        <div class="screen active" id="screen-home">
+          <div class="home-wrap">
+            <div class="home-header" id="homeHeader">
+              <div class="home-logo">🎯</div>
+              <div class="home-title">Focus Guard</div>
+              <div class="home-sub">Stay in the zone.</div>
+            </div>
+            <div class="home-btns" id="homeBtns">
+              <button class="btn-primary" onclick="nav('new-session')">New Session</button>
+              <button class="btn-secondary" onclick="nav('scheduled')">Scheduled Sessions</button>
+              <button class="btn-secondary" onclick="nav('previous')">Previous Sessions</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- NEW SESSION -->
+        <div class="screen" id="screen-new-session">
+          <div class="s-header">
+            <button class="back-btn" onclick="nav('home')">‹</button>
+            <span class="s-title">New Session</span>
+          </div>
+          <div class="form-body">
+            <div class="form-group">
+              <label class="form-label">Session Name</label>
+              <input class="form-input" type="text" id="fName" placeholder="e.g. Deep Work Block">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Goal Time (minutes)</label>
+              <input class="form-input" type="number" id="fGoal" value="45" min="1" oninput="calcPlanned()">
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Pauses</label>
+                <input class="form-input" type="number" id="fPauses" value="2" min="0" oninput="calcPlanned()">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Pause Duration (min)</label>
+                <input class="form-input" type="number" id="fPauseDur" value="5" min="0" oninput="calcPlanned()">
+              </div>
+            </div>
+            <div class="time-preview" id="timePrev"></div>
+          </div>
+          <div class="form-actions">
+            <button class="btn-secondary" onclick="openSchedModal()">Schedule</button>
+            <button class="btn-primary" onclick="startSession(null)">▶ Start</button>
+          </div>
+        </div>
+
+        <!-- SCHEDULED -->
+        <div class="screen scrollable" id="screen-scheduled">
+          <div class="s-header">
+            <button class="back-btn" onclick="nav('home')">‹</button>
+            <span class="s-title">Scheduled Sessions</span>
+          </div>
+          <div class="sessions-list" id="schedList"></div>
+        </div>
+
+        <!-- PREVIOUS -->
+        <div class="screen scrollable" id="screen-previous">
+          <div class="s-header">
+            <button class="back-btn" onclick="nav('home')">‹</button>
+            <span class="s-title">Previous Sessions</span>
+          </div>
+          <div class="sessions-list" id="prevList"></div>
+        </div>
+
+        <!-- ACTIVE SESSION -->
+        <div class="screen" id="screen-session">
+          <div class="sess-top">
+            <div>
+              <div class="sess-meta-label">Session</div>
+              <div class="sess-meta-val" id="sessName">—</div>
+            </div>
+            <div style="text-align:right">
+              <div class="sess-meta-label">Goal</div>
+              <div class="sess-meta-val" id="sessGoalLbl">—</div>
+            </div>
+          </div>
+          <div class="sess-mid">
+            <div class="circle-wrap">
+              <svg class="prog-svg" viewBox="0 0 240 240">
+                <circle class="prog-track" cx="120" cy="120" r="105"/>
+                <circle class="prog-bar" id="progBar" cx="120" cy="120" r="105"/>
+              </svg>
+              <div class="sw-display">
+                <div class="sw-time" id="swTime">00:00:00</div>
+                <div class="sw-status" id="swStatus">Focusing…</div>
+              </div>
+            </div>
+            <div class="pause-info">
+              <div class="pause-lbl" id="pauseLbl">Next Pause</div>
+              <div class="pause-val" id="pauseVal">—</div>
+            </div>
+          </div>
+          <div class="sess-btns">
+            <button class="btn-pause" id="pauseBtn" onclick="togglePause()">⏸ Pause</button>
+            <button class="btn-end" onclick="openModal('endModal')">End Session</button>
+          </div>
+        </div>
+
+        <!-- BIG WARNING -->
+        <div class="big-warning" id="bigWarn" onclick="closeBigWarn()">
+          <div class="bw-icon">🚫</div>
+          <div class="bw-text">Stop Using<br>The Phone!</div>
+          <div class="bw-sub">Tap anywhere to dismiss</div>
+        </div>
+        <div class="toast-wrap" id="toastWrap"></div>
+
+        <!-- SCHEDULE MODAL -->
+        <div class="overlay" id="schedModal">
+          <div class="modal">
+            <div class="modal-title">Schedule Session</div>
+            <div class="form-group" style="margin-bottom:11px">
+              <label class="form-label">Session Name</label>
+              <input class="form-input" type="text" id="sName" placeholder="e.g. Morning Focus">
+            </div>
+            <div class="form-row" style="margin-bottom:11px">
+              <div class="form-group">
+                <label class="form-label">Date</label>
+                <input class="form-input" type="date" id="sDate">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Time</label>
+                <input class="form-input" type="time" id="sTime">
+              </div>
+            </div>
+            <div class="conflict-msg" id="conflictMsg"></div>
+            <div id="schedExisting"></div>
+            <div class="modal-row">
+              <button class="mbtn secondary" onclick="closeModal('schedModal')">Cancel</button>
+              <button class="mbtn primary" onclick="doSchedule()">Schedule</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- END CONFIRM -->
+        <div class="overlay" id="endModal">
+          <div class="modal">
+            <div class="modal-title">End Session?</div>
+            <div class="modal-body">Are you sure you want to end this session?</div>
+            <div class="modal-row">
+              <button class="mbtn secondary" onclick="closeModal('endModal')">Cancel</button>
+              <button class="mbtn danger" onclick="endSession()">End Session</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- JOIN SESSION -->
+        <div class="overlay" id="joinModal">
+          <div class="modal">
+            <div class="modal-title">Session Starting!</div>
+            <div class="modal-body" id="joinMsg">Your scheduled session is about to start.</div>
+            <div class="modal-row">
+              <button class="mbtn secondary" onclick="closeModal('joinModal')">Cancel</button>
+              <button class="mbtn primary" style="background:var(--green)" onclick="joinSess()">Join Session</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- PAUSE LOG -->
+        <div class="overlay" id="pauseLogModal">
+          <div class="modal">
+            <div class="modal-title">Pause Log</div>
+            <div id="pauseLogBody"></div>
+            <div class="modal-row"><button class="mbtn secondary" onclick="closeModal('pauseLogModal')">Close</button></div>
+          </div>
+        </div>
+
+        <!-- AI ANALYSIS -->
+        <div class="overlay" id="aiModal">
+          <div class="modal">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <div class="modal-title" style="margin-bottom:0" id="aiTitle">Analysis</div>
+              <div style="font-size:30px;font-weight:900" id="aiScore">—</div>
+            </div>
+            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:10px" id="aiComment"></div>
+            <div style="font-size:12px;color:var(--text2);line-height:1.7" id="aiDesc"></div>
+            <div class="modal-row"><button class="mbtn secondary" onclick="closeModal('aiModal')">Close</button></div>
+          </div>
+        </div>
+
+      </div><!-- /app-screen -->
+      <div class="phone-bar"></div>
+    </div><!-- /phone -->
+  </div><!-- /phoneWrap -->
+
+  <!-- RIGHT CONTROLS -->
+  <div class="ctrl-panel">
+    <div class="ctrl-label">Demo Controls</div>
+    <button class="ctrl-btn danger" onclick="trigBigWarn()">⛔ Big Warning</button>
+    <button class="ctrl-btn warn" onclick="trigSmall(0)" style="margin-top:8px">🔊 Loud Room</button>
+    <button class="ctrl-btn warn" onclick="trigSmall(1)">💡 Bad Lighting</button>
+    <button class="ctrl-btn warn" onclick="trigSmall(2)">📉 Focus Drop</button>
+    <button class="ctrl-btn warn" onclick="trigSmall(3)">😴 No Activity</button>
+  </div>
+
+</div><!-- /scene -->
+
+<script>
+/* ===== DATA ===== */
+const scheduled = [
+  {id:1,name:"Morning Focus",goalTime:90,pauses:2,pauseDur:10,date:"2026-05-16",time:"09:00"},
+  {id:2,name:"Afternoon Deep Work",goalTime:60,pauses:1,pauseDur:5,date:"2026-05-16",time:"14:30"},
+  {id:3,name:"Evening Review",goalTime:30,pauses:0,pauseDur:0,date:"2026-05-17",time:"19:00"},
+];
+
+const previous = [
+  {id:1,name:"Deep Work Block",goalTime:60,actualTime:52,date:"2026-05-14",time:"10:00",
+   pauses:[{status:"planned",duration:5,start:"23:12",end:"28:12"},{status:"unplanned",duration:3,start:"45:08",end:"48:08"}],
+   focusScore:78,
+   ai:{comment:"Good focus with minor distractions.",
+       desc:"You maintained solid concentration for most of the session. Two pauses were recorded — one planned, one unplanned — indicating a generally disciplined approach. The early end (8 minutes short of goal) suggests possible fatigue or external interruption. Consider a slightly shorter goal next time to build momentum, then extend gradually."}},
+  {id:2,name:"Study Session",goalTime:45,actualTime:68,date:"2026-05-13",time:"15:00",
+   pauses:[{status:"planned",duration:5,start:"20:00",end:"25:00"}],
+   focusScore:92,
+   ai:{comment:"Exceptional — you exceeded your goal!",
+       desc:"Outstanding session. You reached your 45-minute goal and continued for an additional 23 minutes, demonstrating strong intrinsic motivation. Only one planned pause was taken with zero unplanned interruptions. This is a personal benchmark. Consider bumping your default goal to 60 minutes for the next session."}},
+  {id:3,name:"Quick Sprint",goalTime:30,actualTime:18,date:"2026-05-12",time:"11:00",
+   pauses:[{status:"unplanned",duration:7,start:"08:03",end:"15:03"},{status:"unplanned",duration:4,start:"20:11",end:"24:11"}],
+   focusScore:34,
+   ai:{comment:"Difficult session — frequent distractions.",
+       desc:"This session shows a pattern of frequent unplanned interruptions that significantly impacted your focus. The session ended 12 minutes early with two unplanned pauses totalling 11 minutes. Identify your distraction triggers before the next session. A quieter environment or Do Not Disturb mode may help substantially."}},
+];
+
+const smallWarnings = [
+  {icon:"🔊",msg:"Your room is loud — can you concentrate?"},
+  {icon:"💡",msg:"Bad lighting detected. Adjust your workspace."},
+  {icon:"📉",msg:"Focus drop detected. Stay with it!"},
+  {icon:"😴",msg:"No activity detected. Are you still focused?"},
+];
+
+/* ===== STATE ===== */
+let sess = null;
+let landscape = false;
+
+/* ===== NAVIGATION ===== */
+function nav(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  if (id === 'scheduled') renderScheduled();
+  if (id === 'previous') renderPrevious();
+  if (id === 'new-session') calcPlanned();
+}
+
+/* ===== HOME ANIMATION ===== */
+function initAnim() {
+  setTimeout(() => document.getElementById('homeHeader').classList.add('done'), 80);
+  setTimeout(() => document.getElementById('homeBtns').classList.add('done'), 150);
+}
+
+/* ===== FORM CALC ===== */
+function calcPlanned() {
+  const g = +document.getElementById('fGoal').value || 0;
+  const p = +document.getElementById('fPauses').value || 0;
+  const d = +document.getElementById('fPauseDur').value || 0;
+  document.getElementById('timePrev').innerHTML =
+    `Goal: <strong>${g} min</strong> &nbsp;+&nbsp; Pauses: <strong>${p * d} min</strong> &nbsp;= &nbsp;<strong>${g + p * d} min total</strong>`;
+}
+
+/* ===== START SESSION ===== */
+function startSession(cfg) {
+  const g  = cfg ? cfg.goalTime : (+document.getElementById('fGoal').value    || 25);
+  const np = cfg ? cfg.pauses   : (+document.getElementById('fPauses').value   || 0);
+  const pd = cfg ? cfg.pauseDur  : (+document.getElementById('fPauseDur').value || 0);
+  const nm = cfg ? cfg.name      : (document.getElementById('fName').value.trim() || 'New Session');
+
+  if (sess && sess.timer) clearInterval(sess.timer);
+
+  const schedule = [];
+  if (np > 0) {
+    const interval = (g * 60) / (np + 1);
+    for (let i = 1; i <= np; i++) schedule.push(Math.floor(interval * i));
+  }
+
+  sess = {
+    name: nm, goalSec: g * 60, elapsed: 0,
+    schedule, pauseDurSec: pd * 60,
+    pauseDone: 0, currentPause: null,
+    pastGoal: false, pauses: [], timer: null,
+  };
+
+  document.getElementById('sessName').textContent = nm;
+  document.getElementById('sessGoalLbl').textContent = g + ' min';
+  const pb = document.getElementById('progBar');
+  pb.classList.remove('over');
+  pb.style.strokeDashoffset = '659.73';
+  document.getElementById('swTime').classList.remove('over');
+
+  nav('session');
+  updateSessUI();
+  sess.timer = setInterval(tick, 1000);
+}
+
+/* ===== SESSION TICK ===== */
+function tick() {
+  if (sess.currentPause) {
+    sess.currentPause.elapsed++;
+    if (sess.currentPause.type === 'planned' && sess.currentPause.elapsed >= sess.pauseDurSec) {
+      finishPause();
+    }
+  } else {
+    sess.elapsed++;
+    if (!sess.pastGoal && sess.elapsed >= sess.goalSec) {
+      sess.pastGoal = true;
+      document.getElementById('progBar').classList.add('over');
+      document.getElementById('swTime').classList.add('over');
+    }
+    const next = sess.schedule[sess.pauseDone];
+    if (next !== undefined && sess.elapsed >= next && !sess.pastGoal) {
+      sess.currentPause = {type:'planned', elapsed:0, startSec:sess.elapsed};
+    }
+  }
+  updateSessUI();
+}
+
+function updateSessUI() {
+  document.getElementById('swTime').textContent = fmt(sess.elapsed);
+
+  const pct = sess.pastGoal ? 1 : Math.min(sess.elapsed / sess.goalSec, 1);
+  document.getElementById('progBar').style.strokeDashoffset = (659.73 * (1 - pct)).toFixed(2);
+
+  const pb = document.getElementById('pauseBtn');
+
+  if (sess.currentPause) {
+    const cp = sess.currentPause;
+    document.getElementById('pauseVal').className = 'pause-val on';
+    if (cp.type === 'planned') {
+      const rem = sess.pauseDurSec - cp.elapsed;
+      document.getElementById('pauseLbl').textContent = 'Pause — Resume in';
+      document.getElementById('pauseVal').textContent = fmtMS(rem);
+      document.getElementById('swStatus').textContent = 'On planned pause';
+      pb.textContent = '⏭ Skip Pause';
+    } else {
+      document.getElementById('pauseLbl').textContent = 'Unplanned Pause';
+      document.getElementById('pauseVal').textContent = fmtMS(cp.elapsed);
+      document.getElementById('swStatus').textContent = 'Unplanned pause active';
+      pb.textContent = '▶ Resume';
+    }
+    pb.className = 'btn-pause on';
+  } else {
+    document.getElementById('pauseVal').className = 'pause-val';
+    pb.textContent = '⏸ Pause';
+    pb.className = 'btn-pause';
+
+    if (sess.pastGoal) {
+      document.getElementById('swStatus').textContent = 'Past goal — still going! 🔵';
+      document.getElementById('pauseLbl').textContent = 'Pauses';
+      document.getElementById('pauseVal').textContent = 'All done';
+    } else {
+      document.getElementById('swStatus').textContent = 'Focusing…';
+      const next = sess.schedule[sess.pauseDone];
+      if (next !== undefined) {
+        document.getElementById('pauseLbl').textContent = 'Next Pause';
+        document.getElementById('pauseVal').textContent = 'in ' + fmtMS(next - sess.elapsed);
+      } else {
+        document.getElementById('pauseLbl').textContent = 'Pauses';
+        document.getElementById('pauseVal').textContent = sess.schedule.length === 0 ? 'None scheduled' : 'All done';
+      }
+    }
+  }
+}
+
+function togglePause() {
+  if (!sess) return;
+  if (sess.currentPause) { finishPause(); }
+  else { sess.currentPause = {type:'unplanned', elapsed:0, startSec:sess.elapsed}; }
+  updateSessUI();
+}
+
+function finishPause() {
+  const cp = sess.currentPause;
+  sess.pauses.push({
+    status: cp.type,
+    duration: Math.ceil(cp.elapsed / 60),
+    start: fmtMS(cp.startSec),
+    end: fmtMS(sess.elapsed),
+  });
+  if (cp.type === 'planned') sess.pauseDone++;
+  sess.currentPause = null;
+}
+
+function endSession() {
+  if (sess && sess.timer) clearInterval(sess.timer);
+  closeModal('endModal');
+  nav('home');
+}
+
+function fmt(s) {
+  return `${pad(Math.floor(s/3600))}:${pad(Math.floor((s%3600)/60))}:${pad(s%60)}`;
+}
+function fmtMS(s) {
+  return `${pad(Math.floor(s/60))}:${pad(s%60)}`;
+}
+function pad(n) { return String(n).padStart(2,'0'); }
+
+/* ===== SCHEDULE MODAL ===== */
+function openSchedModal() {
+  document.getElementById('sDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('sTime').value = '09:00';
+  document.getElementById('sName').value = '';
+  document.getElementById('conflictMsg').style.display = 'none';
+  renderSchedExisting();
+  openModal('schedModal');
+}
+
+function renderSchedExisting() {
+  const c = document.getElementById('schedExisting');
+  c.innerHTML = scheduled.length
+    ? '<div style="font-size:11px;color:var(--text2);margin-bottom:6px">Existing sessions:</div>' +
+      scheduled.map(s =>
+        `<div class="mini-sess"><span class="mini-sess-name">${s.name}</span><span class="mini-sess-date">${s.date} ${s.time}</span></div>`
+      ).join('')
+    : '';
+}
+
+function doSchedule() {
+  const name = document.getElementById('sName').value.trim();
+  const date = document.getElementById('sDate').value;
+  const time = document.getElementById('sTime').value;
+  const g  = +document.getElementById('fGoal').value    || 25;
+  const p  = +document.getElementById('fPauses').value   || 0;
+  const pd = +document.getElementById('fPauseDur').value || 0;
+  const err = document.getElementById('conflictMsg');
+
+  if (!name || !date || !time) {
+    err.textContent = 'Please fill in all fields.';
+    err.style.display = 'block';
+    return;
+  }
+
+  const newStart = new Date(date + 'T' + time);
+  const newEnd   = new Date(newStart.getTime() + (g + p * pd) * 60000);
+
+  const conflict = scheduled.find(s => {
+    const ss = new Date(s.date + 'T' + s.time);
+    const se = new Date(ss.getTime() + (s.goalTime + s.pauses * s.pauseDur) * 60000);
+    return !(newEnd <= ss || newStart >= se);
+  });
+
+  if (conflict) {
+    err.textContent = `Conflicts with "${conflict.name}" (${conflict.date} ${conflict.time}).`;
+    err.style.display = 'block';
+    return;
+  }
+
+  scheduled.push({id:Date.now(), name, goalTime:g, pauses:p, pauseDur:pd, date, time});
+  closeModal('schedModal');
+  nav('home');
+  showToast('✅', `"${name}" scheduled!`);
+}
+
+/* ===== RENDER LISTS ===== */
+function renderScheduled() {
+  const c = document.getElementById('schedList');
+  if (!scheduled.length) {
+    c.innerHTML = '<div class="empty"><div class="empty-icon">📅</div><div class="empty-text">No sessions scheduled yet.</div></div>';
+    return;
+  }
+  c.innerHTML = scheduled.map(s => {
+    const total = s.goalTime + (s.pauses || 0) * (s.pauseDur || 0);
+    return `<div class="scard">
+      <div class="scard-head">
+        <div class="scard-name">${s.name}</div>
+        <div class="scard-badge">${s.date} &nbsp;${s.time}</div>
+      </div>
+      <div class="scard-grid">
+        <div class="detail"><div class="detail-lbl">Goal Time</div><div class="detail-val">${s.goalTime} min</div></div>
+        <div class="detail"><div class="detail-lbl">Planned Total</div><div class="detail-val">${total} min</div></div>
+        <div class="detail"><div class="detail-lbl">Pauses</div><div class="detail-val">${s.pauses || 0} pauses</div></div>
+        <div class="detail"><div class="detail-lbl">Pause Duration</div><div class="detail-val">${s.pauseDur || 0} min each</div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderPrevious() {
+  const c = document.getElementById('prevList');
+  c.innerHTML = previous.map(s => {
+    const col = actualColor(s.actualTime, s.goalTime);
+    const scol = scoreColor(s.focusScore);
+    return `<div class="prev-card" onclick="showAI(${s.id})">
+      <div class="prev-head">
+        <div>
+          <div class="scard-name">${s.name}</div>
+          <div style="font-size:11px;color:var(--text2)">${s.date} · ${s.time}</div>
+        </div>
+        <div class="score-badge" style="color:${scol}">${s.focusScore}</div>
+      </div>
+      <div class="scard-grid">
+        <div class="detail"><div class="detail-lbl">Goal Time</div><div class="detail-val">${s.goalTime} min</div></div>
+        <div class="detail"><div class="detail-lbl">Actual Time</div>
+          <div class="detail-val" style="color:${col}">${s.actualTime} min${s.actualTime > s.goalTime ? ' 🔵' : ''}</div></div>
+        <div class="detail" style="grid-column:1/-1">
+          <div class="detail-lbl">Pauses</div>
+          <div class="detail-val" style="color:var(--accent);cursor:pointer" onclick="event.stopPropagation();showPauseLog(${s.id})">
+            ${s.pauses.length} pause${s.pauses.length !== 1 ? 's' : ''} — tap to view ↗
+          </div>
+        </div>
+      </div>
+      <div class="prev-footer">Tap card for AI analysis</div>
+    </div>`;
+  }).join('');
+}
+
+function actualColor(actual, goal) {
+  if (actual > goal) return '#0A84FF';
+  const hue = Math.round(Math.min(actual / goal, 1) * 118);
+  return `hsl(${hue},88%,55%)`;
+}
+function scoreColor(s) {
+  return s >= 70 ? 'var(--green)' : s >= 40 ? 'var(--yellow)' : 'var(--red)';
+}
+
+function showPauseLog(id) {
+  const s = previous.find(x => x.id === id);
+  if (!s) return;
+  document.getElementById('pauseLogBody').innerHTML = s.pauses.length
+    ? s.pauses.map((p, i) => `
+      <div class="pause-log-item">
+        <div class="pause-log-head">
+          <span style="font-weight:700;color:var(--text);font-size:13px">Pause ${i + 1}</span>
+          <span class="p-status ${p.status}">${p.status}</span>
+        </div>
+        <div class="pause-log-detail">Duration: <span>${p.duration} min</span></div>
+        <div class="pause-log-detail">Time: <span>${p.start} – ${p.end}</span></div>
+      </div>`).join('')
+    : '<div style="color:var(--text2);font-size:13px;padding:8px 0">No pauses recorded.</div>';
+  openModal('pauseLogModal');
+}
+
+function showAI(id) {
+  const s = previous.find(x => x.id === id);
+  if (!s) return;
+  document.getElementById('aiTitle').textContent = s.name;
+  document.getElementById('aiScore').textContent = s.focusScore;
+  document.getElementById('aiScore').style.color = scoreColor(s.focusScore);
+  document.getElementById('aiComment').textContent = s.ai.comment;
+  document.getElementById('aiDesc').textContent = s.ai.desc;
+  openModal('aiModal');
+}
+
+/* ===== JOIN SESSION ===== */
+function joinSess() {
+  closeModal('joinModal');
+  const s = scheduled[0];
+  if (s) startSession({goalTime:s.goalTime, pauses:s.pauses, pauseDur:s.pauseDur, name:s.name});
+  else startSession(null);
+}
+
+/* ===== WARNINGS ===== */
+function trigBigWarn() { document.getElementById('bigWarn').classList.add('open'); }
+function closeBigWarn() { document.getElementById('bigWarn').classList.remove('open'); }
+function trigSmall(i) {
+  const w = smallWarnings[i % smallWarnings.length];
+  showToast(w.icon, w.msg);
+}
+
+function showToast(icon, msg) {
+  const wrap = document.getElementById('toastWrap');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-msg">${msg}</span><button class="toast-x" onclick="rmToast(this)">✕</button>`;
+  wrap.appendChild(t);
+  setTimeout(() => { if (t.parentNode) { t.classList.add('out'); setTimeout(() => t.remove(), 250); } }, 4500);
+}
+function rmToast(btn) { const t = btn.parentElement; t.classList.add('out'); setTimeout(() => t.remove(), 250); }
+
+/* ===== MODALS ===== */
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+/* ===== ROTATION & SCALING ===== */
+function rotatePhone() {
+  landscape = !landscape;
+  document.getElementById('phone').classList.toggle('land', landscape);
+  scalePhone();
+}
+
+function scalePhone() {
+  const wrap = document.getElementById('phoneWrap');
+  const ph   = document.getElementById('phone');
+  const W = landscape ? 844 : 390;
+  const H = landscape ? 390 : 844;
+  const availW = window.innerWidth  - 300;
+  const availH = window.innerHeight * 0.94;
+  const scale = Math.min(availH / H, availW / W, 1.2);
+  ph.style.transformOrigin = 'top left';
+  ph.style.transform = `scale(${scale})`;
+  wrap.style.width  = Math.round(W * scale) + 'px';
+  wrap.style.height = Math.round(H * scale) + 'px';
+}
+
+/* ===== CLOCK ===== */
+function tickClock() {
+  const n = new Date();
+  document.getElementById('sbarTime').textContent = `${n.getHours()}:${String(n.getMinutes()).padStart(2,'0')}`;
+}
+
+/* ===== INIT ===== */
+document.addEventListener('DOMContentLoaded', () => {
+  initAnim();
+  calcPlanned();
+  tickClock();
+  setInterval(tickClock, 15000);
+  scalePhone();
+  window.addEventListener('resize', scalePhone);
+
+  setTimeout(() => {
+    document.getElementById('joinMsg').textContent =
+      `"${scheduled[0].name}" starts in 4 minutes!`;
+    openModal('joinModal');
+  }, 2500);
+});
+</script>
+</body>
+</html>
