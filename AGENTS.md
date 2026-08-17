@@ -212,6 +212,32 @@ $env:JAVA_HOME="$env:USERPROFILE\.jdks\jbr-21.0.11"
 .\gradlew.bat :app:connectedDebugAndroidTest  # Room tests, needs the emulator running
 ```
 
+## Session engine
+
+`SessionEngine` is a `@Singleton` that owns the clock and the rules of a running session.
+`FocusSessionService` only keeps the process alive and renders the notification, so the
+session is unaffected if the service is restarted.
+
+Key decisions, each of which fixed a real bug during Phase 3:
+
+- **Time is derived from timestamps, never counted.** A tick only triggers recomputation,
+  so a delayed or coalesced tick shows the correct time instead of silently drifting.
+- **`attach(sessionId)` is the single, idempotent entry point.** Starting a new session and
+  recovering a killed one are the same code path: state is always rebuilt from stored rows,
+  and a brand-new session simply reconstructs to zero. Attaching to the session already
+  running is a no-op. An earlier design had separate `start`/`restore` paths that raced.
+- **Only the service and `FocusGuardApplication` may attach.** The UI must not, or reopening
+  the app races with the service.
+- **The service must not stop on the first null state.** The engine has no state until the
+  session is loaded, so treating "state is null" as "session finished" killed the service
+  immediately — the timer appeared to work only because the Activity kept the process alive.
+  It now stops only after it has seen a real session.
+- Focus progress is written to Room once a minute, so a process death costs seconds.
+- Reopening the app while a session runs navigates straight to the timer.
+
+Foreground service type is `specialUse` (there is no timer type, and `shortService` caps at
+a few minutes). Phase 4 should add `microphone` once loudness monitoring lands.
+
 ## Build phases
 
 | # | Phase | State |
@@ -219,7 +245,7 @@ $env:JAVA_HOME="$env:USERPROFILE\.jdks\jbr-21.0.11"
 | 0 | Scaffold: Gradle, theme, nav skeleton | ✅ done |
 | 1 | Room entities, DAOs, repository | ✅ done |
 | 2 | Real screens: forms, lists, modals, conflict detection | ✅ done |
-| 3 | Foreground service: timer, pauses, overtime | |
+| 3 | Foreground service: timer, pauses, overtime | ✅ done |
 | 4 | Sensors → warning engine | |
 | 5 | AlarmManager scheduling + notifications | |
 | 6 | OpenAI rating | |

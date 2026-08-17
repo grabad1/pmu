@@ -100,15 +100,26 @@ class NewSessionViewModel @Inject constructor(
         it.copy(scheduleHour = hour, scheduleMinute = minute, scheduleError = null, conflictName = null)
     }
 
-    /** Builds the session the Start button should run. Nothing is persisted here. */
-    fun buildSessionToStart(): Session = uiState.value.let { state ->
-        Session(
-            name = state.name.trim().ifBlank { "New Session" },
-            goalMinutes = state.goalMinutesOrDefault,
-            plannedPauseCount = state.pauseCountOrZero,
-            plannedPauseMinutes = state.pauseMinutesOrZero,
-            status = SessionStatus.RUNNING,
-        )
+    /**
+     * Persists the configured session as RUNNING and hands its id back so the caller can
+     * start the service and navigate. The session row must exist before the service starts,
+     * since the service looks it up by id.
+     */
+    fun startSession(onStarted: (Long) -> Unit) {
+        val state = uiState.value
+        viewModelScope.launch {
+            val id = sessionRepository.insertSession(
+                Session(
+                    name = state.name.trim().ifBlank { "New Session" },
+                    goalMinutes = state.goalMinutesOrDefault,
+                    plannedPauseCount = state.pauseCountOrZero,
+                    plannedPauseMinutes = state.pauseMinutesOrZero,
+                    status = SessionStatus.RUNNING,
+                    startedAt = Instant.now(),
+                )
+            )
+            onStarted(id)
+        }
     }
 
     /**

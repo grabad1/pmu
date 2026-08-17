@@ -89,6 +89,8 @@ private fun PreviousSessionCard(
 ) {
     val session = item.session
     val actualMinutes = session.focusedSeconds / 60
+    val goalSeconds = session.goalMinutes * 60
+    val isOvertime = session.focusedSeconds > goalSeconds
 
     FocusCard(modifier = modifier, onClick = onCardClick) {
         Row(
@@ -131,12 +133,12 @@ private fun PreviousSessionCard(
                 right = {
                     DetailItem(
                         label = stringResource(R.string.detail_actual_time),
-                        value = if (actualMinutes > session.goalMinutes) {
+                        value = if (isOvertime) {
                             stringResource(R.string.value_minutes_over, actualMinutes)
                         } else {
                             stringResource(R.string.value_minutes, actualMinutes)
                         },
-                        valueColor = actualTimeColor(actualMinutes, session.goalMinutes),
+                        valueColor = actualTimeColor(session.focusedSeconds, goalSeconds),
                     )
                 },
             )

@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import rs.etf.focusguard.R
-import rs.etf.focusguard.data.room.Session
 import rs.etf.focusguard.ui.elements.composables.FormField
 import rs.etf.focusguard.ui.elements.composables.PrimaryButton
 import rs.etf.focusguard.ui.elements.composables.ScreenHeader
@@ -37,7 +36,7 @@ import rs.etf.focusguard.ui.stateholders.NewSessionViewModel
 @Composable
 fun NewSessionScreen(
     onBack: () -> Unit,
-    onStart: (Session) -> Unit,
+    onStart: (Long) -> Unit,
     onScheduled: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: NewSessionViewModel = hiltViewModel(),
@@ -106,7 +105,7 @@ fun NewSessionScreen(
             )
             PrimaryButton(
                 text = stringResource(R.string.action_start),
-                onClick = { onStart(viewModel.buildSessionToStart()) },
+                onClick = { viewModel.startSession(onStart) },
                 modifier = Modifier.weight(1f),
             )
         }

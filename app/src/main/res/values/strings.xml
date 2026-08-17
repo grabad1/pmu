@@ -72,5 +72,33 @@
     <string name="analysis_pending_detail">This session has not been rated. AI analysis arrives in a later build.</string>
 
     <!-- Active session -->
-    <string name="session_timer_pending">The live timer, progress ring and pause controls arrive in Phase 3.</string>
+    <string name="session_goal">Goal</string>
+    <string name="session_label">Session</string>
+    <string name="session_focusing">Focusing…</string>
+    <string name="session_past_goal">Past goal — still going! 🔵</string>
+    <string name="session_on_planned_pause">On planned pause</string>
+    <string name="session_on_unplanned_pause">Unplanned pause active</string>
+    <string name="session_next_pause">Next Pause</string>
+    <string name="session_pause_resume_in">Pause — Resume in</string>
+    <string name="session_unplanned_pause">Unplanned Pause</string>
+    <string name="session_pauses">Pauses</string>
+    <string name="session_pauses_none">None scheduled</string>
+    <string name="session_pauses_done">All done</string>
+    <string name="session_next_pause_in">in %1$s</string>
+    <string name="action_pause">⏸  Pause</string>
+    <string name="action_resume">▶  Resume</string>
+    <string name="action_skip_pause">⏭  Skip Pause</string>
+    <string name="action_end_session">End Session</string>
+    <string name="end_dialog_title">End Session?</string>
+    <string name="end_dialog_body">Are you sure you want to end this session?</string>
+    <string name="session_starting">Starting…</string>
+
+    <!-- Session notification -->
+    <string name="session_notification_channel_name">Focus session</string>
+    <string name="session_notification_channel_description">Shows the timer while a focus session is running.</string>
+    <string name="session_notification_focusing">Focusing — %1$s</string>
+    <string name="session_notification_past_goal">Past goal — %1$s</string>
+    <string name="session_notification_planned_pause">Planned pause — %1$s focused</string>
+    <string name="session_notification_unplanned_pause">Paused — %1$s focused</string>
+    <string name="notification_permission_rationale">Focus Guard needs notification access to show your session timer while the app is in the background.</string>
 </resources>

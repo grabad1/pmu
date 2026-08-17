@@ -48,11 +48,14 @@ fun scoreColor(score: Int): Color = when {
 /**
  * Red through to green as focus time approaches the goal, and blue once it is exceeded.
  * The prototype interpolates hue over 0..118 degrees at 88% saturation, 55% lightness.
+ *
+ * Compares seconds rather than whole minutes: 235 s against a 180 s goal is overtime, but
+ * both round to "3 min" and would otherwise lose the distinction.
  */
-fun actualTimeColor(actualMinutes: Int, goalMinutes: Int): Color {
-    if (goalMinutes <= 0) return Blue
-    if (actualMinutes > goalMinutes) return Blue
+fun actualTimeColor(actualSeconds: Int, goalSeconds: Int): Color {
+    if (goalSeconds <= 0) return Blue
+    if (actualSeconds > goalSeconds) return Blue
 
-    val hue = min(actualMinutes.toFloat() / goalMinutes, 1f) * 118f
+    val hue = min(actualSeconds.toFloat() / goalSeconds, 1f) * 118f
     return Color.hsl(hue = hue, saturation = 0.88f, lightness = 0.55f)
 }

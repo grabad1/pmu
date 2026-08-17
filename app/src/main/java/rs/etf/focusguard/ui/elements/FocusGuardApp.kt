@@ -12,17 +12,24 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.toRoute
 import kotlinx.coroutines.launch
 import rs.etf.focusguard.ActiveSession
+import rs.etf.focusguard.FocusSessionService
 import rs.etf.focusguard.Home
 import rs.etf.focusguard.NewSession
 import rs.etf.focusguard.PreviousSessions
@@ -35,15 +42,30 @@ import rs.etf.focusguard.ui.elements.screens.PreviousSessionsScreen
 import rs.etf.focusguard.ui.elements.screens.ScheduledSessionsScreen
 import rs.etf.focusguard.ui.elements.theme.Accent
 import rs.etf.focusguard.ui.elements.theme.Card
+import rs.etf.focusguard.ui.stateholders.FocusGuardAppViewModel
 import rs.etf.focusguard.util.navigateSafely
 import rs.etf.focusguard.util.popBackStackSafely
 
 @Composable
-fun FocusGuardApp() {
+fun FocusGuardApp(
+    viewModel: FocusGuardAppViewModel = hiltViewModel(),
+) {
     val navController = rememberNavController()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val scheduledMessage = stringResource(R.string.schedule_confirmation)
+
+    val runningSession by viewModel.runningSession.collectAsStateWithLifecycle()
+    val currentEntry by navController.currentBackStackEntryAsState()
+
+    // Reopening the app mid-session should land on the timer, not on Home.
+    LaunchedEffect(runningSession != null, currentEntry) {
+        val onSessionScreen = currentEntry?.destination?.hasRoute(ActiveSession::class) == true
+        if (runningSession != null && !onSessionScreen) {
+            navController.navigate(ActiveSession) { popUpTo(Home) }
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -65,8 +87,12 @@ fun FocusGuardApp() {
             composable<NewSession> {
                 NewSessionScreen(
                     onBack = { navController.popBackStackSafely() },
-                    onStart = { session ->
-                        navController.navigateSafely(ActiveSession(sessionName = session.name))
+                    onStart = { sessionId ->
+                        FocusSessionService.start(context, sessionId)
+                        navController.navigateSafely(ActiveSession) {
+                            // The form should not sit behind a running session.
+                            popUpTo(Home)
+                        }
                     },
                     onScheduled = { name ->
                         navController.popBackStackSafely()
@@ -82,10 +108,8 @@ fun FocusGuardApp() {
             composable<PreviousSessions> {
                 PreviousSessionsScreen(onBack = { navController.popBackStackSafely() })
             }
-            composable<ActiveSession> { backStackEntry ->
-                val route: ActiveSession = backStackEntry.toRoute()
+            composable<ActiveSession> {
                 ActiveSessionScreen(
-                    sessionName = route.sessionName,
                     onFinished = { navController.popBackStackSafely(Home, inclusive = false) },
                 )
             }

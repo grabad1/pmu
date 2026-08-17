@@ -21,6 +21,6 @@ data object ScheduledSessions : FocusGuardDestination
 @Serializable
 data object PreviousSessions : FocusGuardDestination
 
-/** Carries the session name so the running screen can title itself before Phase 3's service exists. */
+/** The running session; the engine holds its state, so no arguments are needed. */
 @Serializable
-data class ActiveSession(val sessionName: String) : FocusGuardDestination
+data object ActiveSession : FocusGuardDestination
