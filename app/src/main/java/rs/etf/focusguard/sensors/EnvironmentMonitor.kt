@@ -53,14 +53,28 @@ class EnvironmentMonitor @Inject constructor(
         ),
     )
 
-    /** Most recent reading per sensor, evaluated and sampled on a timer. */
+    /** Most recent reading per sensor, used for conditions that change slowly. */
     private val latest = java.util.concurrent.ConcurrentHashMap<SensorKind, Float>()
+
+    /**
+     * Highest reading seen since the last evaluation.
+     *
+     * Movement and noise are transient: picking up a phone is a burst of a few hundred
+     * milliseconds, which a once-a-second look at the latest value would step straight over.
+     * Keeping the peak means no spike is missed regardless of tick alignment.
+     */
+    private val peakSinceEvaluation = java.util.concurrent.ConcurrentHashMap<SensorKind, Float>()
+
+    /** Highest reading since the last write to Room, so stored history shows spikes too. */
+    private val peakSinceSample = java.util.concurrent.ConcurrentHashMap<SensorKind, Float>()
 
     private var evaluationJob: Job? = null
 
     fun start() {
         trackers.values.forEach(ConditionTracker::reset)
         latest.clear()
+        peakSinceEvaluation.clear()
+        peakSinceSample.clear()
         startEvaluating()
     }
 
@@ -68,6 +82,8 @@ class EnvironmentMonitor @Inject constructor(
         evaluationJob?.cancel()
         evaluationJob = null
         latest.clear()
+        peakSinceEvaluation.clear()
+        peakSinceSample.clear()
     }
 
     /**
@@ -84,6 +100,8 @@ class EnvironmentMonitor @Inject constructor(
             return
         }
         latest[kind] = value
+        peakSinceEvaluation.merge(kind, value, ::maxOf)
+        peakSinceSample.merge(kind, value, ::maxOf)
     }
 
     /**
@@ -115,29 +133,17 @@ class EnvironmentMonitor @Inject constructor(
 
         val nowSeconds = System.nanoTime() / 1_000_000_000L
 
+        // "Too dark" is a floor, so the newest reading is what matters; a peak would hide it.
         latest[SensorKind.LIGHT]?.let { lux ->
-            raiseIf(
-                WarningKind.BAD_LIGHT,
-                lux < EnvironmentThresholds.DARK_LUX,
-                nowSeconds,
-                lux,
-            )
+            raiseIf(WarningKind.BAD_LIGHT, lux < EnvironmentThresholds.DARK_LUX, nowSeconds, lux)
         }
-        latest[SensorKind.NOISE]?.let { db ->
-            raiseIf(
-                WarningKind.LOUD_ROOM,
-                db > EnvironmentThresholds.LOUD_DB,
-                nowSeconds,
-                db,
-            )
+
+        // Noise and movement are ceilings, and both are spiky, so the peak is the honest value.
+        peakSinceEvaluation.remove(SensorKind.NOISE)?.let { db ->
+            raiseIf(WarningKind.LOUD_ROOM, db > EnvironmentThresholds.LOUD_DB, nowSeconds, db)
         }
-        latest[SensorKind.MOTION]?.let { ms2 ->
-            raiseIf(
-                WarningKind.MOVEMENT,
-                ms2 > EnvironmentThresholds.MOVEMENT_MS2,
-                nowSeconds,
-                ms2,
-            )
+        peakSinceEvaluation.remove(SensorKind.MOTION)?.let { ms2 ->
+            raiseIf(WarningKind.MOVEMENT, ms2 > EnvironmentThresholds.MOVEMENT_MS2, nowSeconds, ms2)
         }
     }
 
@@ -154,8 +160,15 @@ class EnvironmentMonitor @Inject constructor(
 
         val now = Instant.now()
         val samples = latest.map { (kind, value) ->
-            SensorSample(sessionId = sessionId, kind = kind, value = value, recordedAt = now)
+            // Spiky signals are stored at their peak so the history shows that the phone was
+            // moved, rather than whatever happened to be true at the instant of the write.
+            val stored = when (kind) {
+                SensorKind.LIGHT -> value
+                SensorKind.NOISE, SensorKind.MOTION -> peakSinceSample[kind] ?: value
+            }
+            SensorSample(sessionId = sessionId, kind = kind, value = stored, recordedAt = now)
         }
+        peakSinceSample.clear()
         repository.insertSensorSamples(samples)
     }
 

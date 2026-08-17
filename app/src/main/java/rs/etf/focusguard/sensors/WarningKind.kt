@@ -38,7 +38,13 @@ object EnvironmentThresholds {
      * it up comfortably exceeds this; typing beside it does not.
      */
     const val MOVEMENT_MS2 = 2.5f
-    const val MOVEMENT_SUSTAIN_SECONDS = 2L
+
+    /**
+     * Zero, deliberately. Handling a phone is a burst of a few hundred milliseconds, not a
+     * sustained state, so requiring it to persist would mean it never fired. The cooldown,
+     * not a sustain window, is what stops repeated warnings.
+     */
+    const val MOVEMENT_SUSTAIN_SECONDS = 0L
 
     /** Repeating the same warning is just noise, so each kind has a cooldown. */
     const val COOLDOWN_SECONDS = 120L

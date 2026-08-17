@@ -77,6 +77,16 @@ class ConditionTrackerTest {
     }
 
     @Test
+    fun `a zero sustain window warns on the first violating reading`() {
+        // Movement is configured this way: handling a phone is a burst, not a state.
+        val tracker = tracker(sustain = 0, cooldown = 60)
+
+        assertTrue(tracker.update(violating = true, nowSeconds = 100))
+        assertFalse(tracker.update(violating = true, nowSeconds = 130))
+        assertTrue(tracker.update(violating = true, nowSeconds = 160))
+    }
+
+    @Test
     fun `a continuing problem does not warn on every reading`() {
         val tracker = tracker(sustain = 5, cooldown = 30)
         var warnings = 0

@@ -255,7 +255,18 @@ observers attached to `FocusSessionService`, so they are unregistered when the s
 - Movement is the only full-screen interruption; light and noise are toasts.
 
 Current thresholds: dark below 15 lux for 20 s, loud above 70 dB for 15 s, movement above
-2.5 m/s² for 2 s, each with a 120 s cooldown. Samples are stored every 10 s.
+2.5 m/s² with **no** sustain window, each with a 120 s cooldown. Samples are stored every 10 s.
+
+Movement is treated as an instantaneous event on purpose. Picking up a phone is a burst of a
+few hundred milliseconds, so a sustain window meant it effectively never fired, and a
+once-a-second look at the *latest* value stepped straight over the spike. Spiky signals
+(motion, noise) are therefore evaluated on the **peak since the last tick**; ambient light,
+which is a floor rather than a ceiling, still uses the latest reading.
+
+Note for testing: dragging the accelerometer in the emulator's Extended Controls only
+*rotates* the device. Gravity's direction changes but its magnitude does not, so linear
+acceleration stays near zero and nothing is detected. Inject a real spike instead:
+`adb emu sensor set acceleration 1:16:4` then back to `0:9.8:0`.
 
 **Noise is unverified.** The emulator's microphone only ever returns silence, so
 `MicrophoneNoiseSource` has never produced a non-zero reading. It sits behind the `NoiseSource`
