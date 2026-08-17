@@ -93,7 +93,7 @@ class FocusSessionService : LifecycleService() {
 
             ACTION_TOGGLE_PAUSE -> sessionEngine.togglePause()
 
-            ACTION_END -> sessionEngine.endSession()
+            ACTION_END -> lifecycleScope.launch { sessionEngine.endSession() }
 
             // Restarted by the system after the process was killed mid-session.
             else -> sessionEngine.attachRunning()

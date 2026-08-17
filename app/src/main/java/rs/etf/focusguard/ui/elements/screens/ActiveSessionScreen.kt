@@ -60,10 +60,13 @@ fun ActiveSessionScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showEndDialog by remember { mutableStateOf(false) }
+    var hasSeenSession by remember { mutableStateOf(false) }
 
-    // The engine clears its state once the session is stored, which is the signal to leave.
+    // The engine has no state until it has attached, so null only means "finished" once a
+    // session has actually been seen. Reacting to the first null would bounce straight back
+    // to Home on the way in.
     LaunchedEffect(state) {
-        if (state == null) onFinished()
+        if (state != null) hasSeenSession = true else if (hasSeenSession) onFinished()
     }
 
     val current = state ?: return
@@ -98,7 +101,7 @@ fun ActiveSessionScreen(
                     text = stringResource(R.string.action_end_session),
                     onClick = {
                         showEndDialog = false
-                        viewModel.endSession(onFinished)
+                        viewModel.endSession()
                     },
                     style = DialogButtonStyle.DANGER,
                 )

@@ -20,8 +20,12 @@ class ActiveSessionViewModel @Inject constructor(
 
     fun togglePause() = sessionEngine.togglePause()
 
-    fun endSession(onEnded: () -> Unit) = viewModelScope.launch {
-        sessionEngine.endSession { onEnded() }
+    /**
+     * Ends the session and stops the service. Navigation is deliberately not triggered here:
+     * the screen reacts to the engine's state going null, which happens on the main thread.
+     */
+    fun endSession() = viewModelScope.launch {
+        sessionEngine.endSession()
         FocusSessionService.stop(context)
     }
 }

@@ -134,30 +134,32 @@ class SessionEngine @Inject constructor(
         }
     }
 
-    fun endSession(onEnded: (Long) -> Unit = {}) {
-        scope.launch {
-            if (pauseType != null) endCurrentPause()
+    /**
+     * Finishes the session and stores it. Suspends until the write completes so callers can
+     * safely act afterwards; navigation must never be triggered from the engine's own
+     * background scope.
+     */
+    suspend fun endSession() {
+        if (pauseType != null) endCurrentPause()
 
-            val ended = mutex.withLock {
-                val current = session ?: return@withLock null
-                val focused = computeFocusedSeconds()
-                val finished = current.copy(
-                    status = SessionStatus.COMPLETED,
-                    endedAt = Instant.now(),
-                    focusedSeconds = focused,
-                )
-                session = null
-                focusSegmentStart = null
-                finished
-            } ?: return@launch
-
-            repository.updateSession(ended)
-            ticker?.cancel()
-            ticker = null
-            _state.value = null
-            Log.d(LOG_TAG, "SessionEngine.endSession(${ended.id}) focused=${ended.focusedSeconds}")
-            onEnded(ended.id)
+        val ended = mutex.withLock {
+            val current = session ?: return
+            val focused = computeFocusedSeconds()
+            val finished = current.copy(
+                status = SessionStatus.COMPLETED,
+                endedAt = Instant.now(),
+                focusedSeconds = focused,
+            )
+            session = null
+            focusSegmentStart = null
+            finished
         }
+
+        repository.updateSession(ended)
+        ticker?.cancel()
+        ticker = null
+        _state.value = null
+        Log.d(LOG_TAG, "SessionEngine.endSession(${ended.id}) focused=${ended.focusedSeconds}")
     }
 
     private fun startTicking() {
