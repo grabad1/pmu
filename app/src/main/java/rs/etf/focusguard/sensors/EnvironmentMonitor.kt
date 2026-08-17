@@ -142,8 +142,18 @@ class EnvironmentMonitor @Inject constructor(
         peakSinceEvaluation.remove(SensorKind.NOISE)?.let { db ->
             raiseIf(WarningKind.LOUD_ROOM, db > EnvironmentThresholds.LOUD_DB, nowSeconds, db)
         }
-        peakSinceEvaluation.remove(SensorKind.MOTION)?.let { ms2 ->
-            raiseIf(WarningKind.MOVEMENT, ms2 > EnvironmentThresholds.MOVEMENT_MS2, nowSeconds, ms2)
+
+        // Acceleration and rotation are two symptoms of one problem — the phone is in someone's
+        // hand — so they share a warning and its cooldown rather than firing twice.
+        val motionPeak = peakSinceEvaluation.remove(SensorKind.MOTION)
+        val rotationPeak = peakSinceEvaluation.remove(SensorKind.ROTATION)
+
+        val moved = (motionPeak ?: 0f) > EnvironmentThresholds.MOVEMENT_MS2
+        val turned = (rotationPeak ?: 0f) > EnvironmentThresholds.ROTATION_RAD_S
+
+        if (motionPeak != null || rotationPeak != null) {
+            val reported = if (turned && !moved) rotationPeak ?: 0f else motionPeak ?: 0f
+            raiseIf(WarningKind.MOVEMENT, moved || turned, nowSeconds, reported)
         }
     }
 
@@ -164,7 +174,8 @@ class EnvironmentMonitor @Inject constructor(
             // moved, rather than whatever happened to be true at the instant of the write.
             val stored = when (kind) {
                 SensorKind.LIGHT -> value
-                SensorKind.NOISE, SensorKind.MOTION -> peakSinceSample[kind] ?: value
+                SensorKind.NOISE, SensorKind.MOTION, SensorKind.ROTATION ->
+                    peakSinceSample[kind] ?: value
             }
             SensorSample(sessionId = sessionId, kind = kind, value = stored, recordedAt = now)
         }

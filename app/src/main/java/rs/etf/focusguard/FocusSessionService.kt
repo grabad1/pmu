@@ -28,6 +28,7 @@ import rs.etf.focusguard.sensors.EnvironmentMonitor
 import rs.etf.focusguard.sensors.LightLifecycleAwareMonitor
 import rs.etf.focusguard.sensors.MotionLifecycleAwareMonitor
 import rs.etf.focusguard.sensors.NoiseLifecycleAwareMonitor
+import rs.etf.focusguard.sensors.RotationLifecycleAwareMonitor
 import rs.etf.focusguard.util.formatHoursMinutesSeconds
 import javax.inject.Inject
 
@@ -75,6 +76,9 @@ class FocusSessionService : LifecycleService() {
     lateinit var motionMonitor: MotionLifecycleAwareMonitor
 
     @Inject
+    lateinit var rotationMonitor: RotationLifecycleAwareMonitor
+
+    @Inject
     lateinit var noiseMonitor: NoiseLifecycleAwareMonitor
 
     private var isObservingState = false
@@ -95,6 +99,7 @@ class FocusSessionService : LifecycleService() {
         environmentMonitor.start()
         lifecycle.addObserver(lightMonitor)
         lifecycle.addObserver(motionMonitor)
+        lifecycle.addObserver(rotationMonitor)
         lifecycle.addObserver(noiseMonitor)
     }
 

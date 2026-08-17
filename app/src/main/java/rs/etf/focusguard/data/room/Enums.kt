@@ -35,4 +35,7 @@ enum class SensorKind {
 
     /** Linear acceleration magnitude, in m/s². */
     MOTION,
+
+    /** Angular velocity magnitude, in rad/s. Turning a phone means holding it. */
+    ROTATION,
 }

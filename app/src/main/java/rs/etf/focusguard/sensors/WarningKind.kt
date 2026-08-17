@@ -46,6 +46,15 @@ object EnvironmentThresholds {
      */
     const val MOVEMENT_SUSTAIN_SECONDS = 0L
 
+    /**
+     * Angular velocity, in rad/s. Turning a phone to look at it is a deliberate act, and one
+     * that linear acceleration can miss: a phone rotated smoothly in the hand barely
+     * accelerates, but its orientation changes a great deal.
+     *
+     * 1 rad/s is roughly 57°/s — a clear turn, not a nudge from a passing hand.
+     */
+    const val ROTATION_RAD_S = 1.0f
+
     /** Repeating the same warning is just noise, so each kind has a cooldown. */
     const val COOLDOWN_SECONDS = 120L
 

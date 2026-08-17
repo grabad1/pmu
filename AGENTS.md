@@ -253,9 +253,14 @@ observers attached to `FocusSessionService`, so they are unregistered when the s
 - Thresholds and sustain/cooldown windows live in `EnvironmentThresholds`, and the debounce
   rules are in `ConditionTracker`, which is clock-free and unit-tested.
 - Movement is the only full-screen interruption; light and noise are toasts.
+- **Rotation counts as movement.** A phone turned smoothly in the hand barely accelerates, so
+  the gyroscope catches handling that linear acceleration misses. Both feed one warning and
+  share its cooldown, since they are two symptoms of the same thing.
+- **Light warns only on darkness** (`lux < DARK_LUX`), never on brightness.
 
 Current thresholds: dark below 15 lux for 20 s, loud above 70 dB for 15 s, movement above
-2.5 m/s² with **no** sustain window, each with a 120 s cooldown. Samples are stored every 10 s.
+2.5 m/s² or rotation above 1.0 rad/s with **no** sustain window, each with a 120 s cooldown.
+Samples are stored every 10 s.
 
 Movement is treated as an instantaneous event on purpose. Picking up a phone is a burst of a
 few hundred milliseconds, so a sustain window meant it effectively never fired, and a
@@ -265,8 +270,16 @@ which is a floor rather than a ceiling, still uses the latest reading.
 
 Note for testing: dragging the accelerometer in the emulator's Extended Controls only
 *rotates* the device. Gravity's direction changes but its magnitude does not, so linear
-acceleration stays near zero and nothing is detected. Inject a real spike instead:
-`adb emu sensor set acceleration 1:16:4` then back to `0:9.8:0`.
+acceleration stays near zero. Inject values instead:
+
+```powershell
+adb emu sensor set acceleration 1:16:4   # then back to 0:9.8:0 — a pick-up
+adb emu sensor set gyroscope 0:0:2       # then back to 0:0:0   — a turn
+adb emu sensor set light 2               # darkness; there is no light control in the UI
+```
+
+The Extended Controls panel has no ambient-light slider at all, which is why the light
+warning appears not to work when tested by hand.
 
 **Noise is unverified.** The emulator's microphone only ever returns silence, so
 `MicrophoneNoiseSource` has never produced a non-zero reading. It sits behind the `NoiseSource`

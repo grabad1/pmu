@@ -110,3 +110,46 @@ class MotionLifecycleAwareMonitor @Inject constructor(
         sensorManager = null
     }
 }
+
+/**
+ * Rotation, as the magnitude of angular velocity in rad/s.
+ *
+ * Complements the accelerometer rather than duplicating it: a phone turned smoothly in the
+ * hand barely accelerates, so linear acceleration can miss it entirely, while its orientation
+ * changes unmistakably. Both mean the same thing — someone is holding the phone.
+ */
+class RotationLifecycleAwareMonitor @Inject constructor(
+    @param:ApplicationContext private val context: Context,
+    private val environmentMonitor: EnvironmentMonitor,
+) : DefaultLifecycleObserver {
+
+    private var sensorManager: SensorManager? = null
+
+    private val listener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent) {
+            val x = event.values[0]
+            val y = event.values[1]
+            val z = event.values[2]
+            environmentMonitor.onReading(SensorKind.ROTATION, sqrt(x * x + y * y + z * z))
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+    }
+
+    override fun onCreate(owner: LifecycleOwner) {
+        val manager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        sensorManager = manager
+
+        val sensor = manager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
+        if (sensor == null) {
+            Log.w(LOG_TAG, "No gyroscope on this device")
+            return
+        }
+        manager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+    }
+
+    override fun onDestroy(owner: LifecycleOwner) {
+        sensorManager?.unregisterListener(listener)
+        sensorManager = null
+    }
+}
