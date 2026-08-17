@@ -251,6 +251,15 @@ a few minutes). Phase 4 should add `microphone` once loudness monitoring lands.
 | 6 | OpenAI rating | |
 | 7 | Landscape, animations, polish | |
 
+## Known issues
+
+- **Landscape on the running-session screen.** The dial is a fixed 224 dp, so in landscape
+  there is not enough height for header + dial + pause readout + buttons. `SpaceBetween`
+  squeezes the buttons to a few pixels and clips their labels. The prototype solves this by
+  shrinking the circle to 148 px and tightening the gaps in landscape; do the same, driven
+  by `WindowSizeClass` or the available height. Deferred to Phase 7. Rotation itself is
+  safe — the session keeps running, since the engine is a singleton.
+
 Phases 0-3 produce a genuinely usable focus timer; everything after is additive.
 
 ## Working agreement
