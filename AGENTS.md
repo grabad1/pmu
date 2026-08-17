@@ -258,7 +258,7 @@ observers attached to `FocusSessionService`, so they are unregistered when the s
   share its cooldown, since they are two symptoms of the same thing.
 - **Light warns only on darkness** (`lux < DARK_LUX`), never on brightness.
 
-Current thresholds: dark below 15 lux for 20 s, loud above 70 dB for 15 s, movement above
+Current thresholds: dark below 15 lux for 10 s, loud above 70 dB for 15 s, movement above
 2.5 m/s² or rotation above 1.0 rad/s with **no** sustain window, each with a 120 s cooldown.
 Samples are stored every 10 s.
 

@@ -24,7 +24,12 @@ object EnvironmentThresholds {
 
     /** Below this a desk is too dim for sustained work; a dim room reads 30-80 lux. */
     const val DARK_LUX = 15f
-    const val DARK_SUSTAIN_SECONDS = 20L
+
+    /**
+     * Long enough to ignore a hand passing over the sensor, short enough that the warning
+     * arrives while it is still worth acting on.
+     */
+    const val DARK_SUSTAIN_SECONDS = 10L
 
     /**
      * Relative loudness, not calibrated SPL — the microphone reports amplitude, which is only
