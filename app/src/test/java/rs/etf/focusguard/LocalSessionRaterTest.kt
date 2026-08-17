@@ -9,12 +9,12 @@ import rs.etf.focusguard.data.SessionSummary
 class LocalSessionRaterTest {
 
     private fun summary(
-        goalMinutes: Int = 60,
-        focusedMinutes: Int = 60,
-        plannedPauseCount: Int = 2,
-        plannedPausesTaken: Int = 2,
+        goalMinutes: Int = 45,
+        focusedMinutes: Int = 45,
+        plannedPauseCount: Int = 0,
+        plannedPausesTaken: Int = 0,
         unplannedPauseCount: Int = 0,
-        unplannedPauseMinutes: Int = 0,
+        unplannedPauseSeconds: Int = 0,
         darkFraction: Double = 0.0,
         loudFraction: Double = 0.0,
         movementFraction: Double = 0.0,
@@ -25,48 +25,73 @@ class LocalSessionRaterTest {
         plannedPauseCount = plannedPauseCount,
         plannedPausesTaken = plannedPausesTaken,
         unplannedPauseCount = unplannedPauseCount,
-        unplannedPauseMinutes = unplannedPauseMinutes,
+        unplannedPauseSeconds = unplannedPauseSeconds,
         darkFraction = darkFraction,
         loudFraction = loudFraction,
         movementFraction = movementFraction,
     )
 
     @Test
-    fun `a flawless session scores full marks`() {
+    fun `a long clean session scores full marks`() {
         assertEquals(100, LocalSessionRater.score(summary()))
     }
 
     @Test
-    fun `exceeding the goal is not penalised`() {
-        val met = LocalSessionRater.score(summary(focusedMinutes = 60))
-        val exceeded = LocalSessionRater.score(summary(focusedMinutes = 95))
-
-        assertEquals(met, exceeded)
-    }
-
-    @Test
-    fun `stopping halfway roughly halves the goal component`() {
-        val full = LocalSessionRater.score(summary(focusedMinutes = 60))
-        val half = LocalSessionRater.score(summary(focusedMinutes = 30))
-
-        // 60 points ride on the goal, so half of it costs about 30.
-        assertEquals(30, full - half)
-    }
-
-    @Test
-    fun `unplanned pauses lower the score and planned ones do not`() {
-        val clean = LocalSessionRater.score(summary(unplannedPauseCount = 0))
-        val one = LocalSessionRater.score(summary(unplannedPauseCount = 1))
-        val three = LocalSessionRater.score(summary(unplannedPauseCount = 3))
-
-        assertTrue("one unplanned pause should cost", one < clean)
-        assertTrue("more unplanned pauses should cost more", three < one)
-
-        // Taking every planned pause is the baseline, not a penalty.
-        val allPlannedTaken = LocalSessionRater.score(
-            summary(plannedPauseCount = 4, plannedPausesTaken = 4),
+    fun `exceeding the goal is never penalised`() {
+        assertEquals(
+            LocalSessionRater.score(summary(focusedMinutes = 45)),
+            LocalSessionRater.score(summary(focusedMinutes = 70)),
         )
-        assertEquals(clean, allPlannedTaken)
+    }
+
+    // --- session length -----------------------------------------------------------------
+
+    @Test
+    fun `a four minute session cannot score highly however clean it is`() {
+        val tiny = LocalSessionRater.score(summary(goalMinutes = 4, focusedMinutes = 4))
+
+        assertTrue("a 4-minute session scored $tiny", tiny <= 60)
+    }
+
+    @Test
+    fun `the length ceiling relaxes as sessions get longer`() {
+        val four = LocalSessionRater.score(summary(goalMinutes = 4, focusedMinutes = 4))
+        val eight = LocalSessionRater.score(summary(goalMinutes = 8, focusedMinutes = 8))
+        val fifteen = LocalSessionRater.score(summary(goalMinutes = 15, focusedMinutes = 15))
+        val thirty = LocalSessionRater.score(summary(goalMinutes = 30, focusedMinutes = 30))
+
+        assertTrue(four < eight)
+        assertTrue(eight < fifteen)
+        assertTrue(fifteen < thirty)
+        assertEquals(100, thirty)
+    }
+
+    @Test
+    fun `a short session is told to aim longer`() {
+        val rating = LocalSessionRater.rate(summary(goalMinutes = 4, focusedMinutes = 4))
+
+        assertTrue(rating.comment.contains("short", ignoreCase = true))
+        assertTrue(rating.analysis.contains("20 to 25 minutes"))
+    }
+
+    // --- planned pauses -----------------------------------------------------------------
+
+    @Test
+    fun `a sensible number of planned pauses costs nothing`() {
+        val none = LocalSessionRater.score(summary(plannedPauseCount = 0))
+        val two = LocalSessionRater.score(summary(plannedPauseCount = 2, plannedPausesTaken = 2))
+
+        assertEquals(none, two)
+    }
+
+    @Test
+    fun `too many planned pauses for the goal length lowers the score`() {
+        // The stated example: 45 minutes with no breaks versus 45 minutes chopped into five.
+        val clean = LocalSessionRater.score(summary(plannedPauseCount = 0))
+        val chopped = LocalSessionRater.score(summary(plannedPauseCount = 5, plannedPausesTaken = 5))
+
+        assertTrue("5 breaks in 45 minutes should cost", chopped < clean)
+        assertEquals(15, clean - chopped)
     }
 
     @Test
@@ -74,35 +99,84 @@ class LocalSessionRaterTest {
         val took = LocalSessionRater.score(summary(plannedPauseCount = 2, plannedPausesTaken = 2))
         val skipped = LocalSessionRater.score(summary(plannedPauseCount = 2, plannedPausesTaken = 0))
 
-        assertEquals(10, took - skipped)
+        assertEquals(15, took - skipped)
+    }
+
+    // --- unplanned pauses ---------------------------------------------------------------
+
+    @Test
+    fun `a brief unplanned pause is forgiven`() {
+        val clean = LocalSessionRater.score(summary())
+        val quickCall = LocalSessionRater.score(
+            summary(unplannedPauseCount = 1, unplannedPauseSeconds = 90),
+        )
+
+        assertEquals(clean, quickCall)
     }
 
     @Test
-    fun `a poor environment lowers the score`() {
-        val comfortable = LocalSessionRater.score(summary())
-        val dark = LocalSessionRater.score(summary(darkFraction = 1.0))
-        val awful = LocalSessionRater.score(
-            summary(darkFraction = 1.0, loudFraction = 1.0, movementFraction = 1.0),
+    fun `unplanned pauses cost in proportion to their length`() {
+        val short = LocalSessionRater.score(
+            summary(unplannedPauseCount = 1, unplannedPauseSeconds = 5 * 60),
+        )
+        val long = LocalSessionRater.score(
+            summary(unplannedPauseCount = 1, unplannedPauseSeconds = 20 * 60),
         )
 
-        assertEquals(10, comfortable - dark)
-        assertEquals(30, comfortable - awful)
+        assertTrue("a longer break should cost more", long < short)
     }
+
+    @Test
+    fun `many short breaks are worse than one of the same total length`() {
+        val one = LocalSessionRater.score(
+            summary(unplannedPauseCount = 1, unplannedPauseSeconds = 10 * 60),
+        )
+        val many = LocalSessionRater.score(
+            summary(unplannedPauseCount = 6, unplannedPauseSeconds = 10 * 60),
+        )
+
+        assertTrue("a fragmented session should score lower", many < one)
+    }
+
+    // --- environment --------------------------------------------------------------------
+
+    @Test
+    fun `a brief environmental problem is ignored`() {
+        val clean = LocalSessionRater.score(summary())
+        val steppedOut = LocalSessionRater.score(summary(movementFraction = 0.15))
+
+        assertEquals(clean, steppedOut)
+    }
+
+    @Test
+    fun `movement matters more than noise and noise more than light`() {
+        val clean = LocalSessionRater.score(summary())
+        val moved = clean - LocalSessionRater.score(summary(movementFraction = 1.0))
+        val loud = clean - LocalSessionRater.score(summary(loudFraction = 1.0))
+        val dark = clean - LocalSessionRater.score(summary(darkFraction = 1.0))
+
+        assertTrue("movement $moved should outweigh noise $loud", moved > loud)
+        assertTrue("noise $loud should outweigh light $dark", loud > dark)
+        assertTrue("light should barely matter, cost $dark", dark <= 5)
+    }
+
+    // --- bounds -------------------------------------------------------------------------
 
     @Test
     fun `the score always stays within bounds`() {
         val worst = LocalSessionRater.score(
             summary(
+                goalMinutes = 60,
                 focusedMinutes = 0,
+                plannedPauseCount = 8,
                 plannedPausesTaken = 0,
                 unplannedPauseCount = 20,
-                unplannedPauseMinutes = 90,
+                unplannedPauseSeconds = 90 * 60,
                 darkFraction = 1.0,
                 loudFraction = 1.0,
                 movementFraction = 1.0,
             )
         )
-        assertTrue("got $worst", worst in 0..100)
         assertEquals(0, worst)
     }
 
@@ -114,8 +188,6 @@ class LocalSessionRaterTest {
 
     @Test
     fun `partial minutes still count towards the goal`() {
-        // 44 seconds of a one-minute goal is most of the way there; whole-minute arithmetic
-        // would score it as nothing.
         val almost = SessionSummary(
             name = "Test",
             goalMinutes = 1,
@@ -123,26 +195,13 @@ class LocalSessionRaterTest {
             plannedPauseCount = 0,
             plannedPausesTaken = 0,
             unplannedPauseCount = 0,
-            unplannedPauseMinutes = 0,
+            unplannedPauseSeconds = 0,
             darkFraction = 0.0,
             loudFraction = 0.0,
             movementFraction = 0.0,
         )
 
-        // 44/60 of the 60 goal points is 44, plus 10 discipline and 30 environment.
-        assertEquals(84, LocalSessionRater.score(almost))
-    }
-
-    @Test
-    fun `the wording reflects the outcome`() {
-        val exceeded = LocalSessionRater.rate(summary(focusedMinutes = 95))
-        assertTrue(exceeded.comment.contains("Exceptional"))
-        assertTrue(exceeded.analysis.contains("No unplanned pauses"))
-
-        val struggled = LocalSessionRater.rate(
-            summary(focusedMinutes = 8, unplannedPauseCount = 3, movementFraction = 0.9),
-        )
-        assertTrue(struggled.analysis.contains("unplanned"))
-        assertTrue(struggled.analysis.contains("phone was handled"))
+        // Most of a one-minute goal, but far too short to score well.
+        assertTrue(LocalSessionRater.score(almost) in 1..60)
     }
 }

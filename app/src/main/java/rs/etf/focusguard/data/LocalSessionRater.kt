@@ -12,14 +12,39 @@ data class SessionRating(
 /**
  * Scores a session without any network call.
  *
- * Used when no API key is configured, when the request fails, and as a sanity check on the
- * AI: a session always ends up rated, so a flat network cannot cost the user their history.
+ * Used when no API key is configured and when the request fails, but also serves as the
+ * app's definition of a good session: the AI prompt describes these same rules, so the two
+ * cannot drift apart.
  *
- * The weighting reflects the app's opinion of what focus means — reaching the goal matters
- * most, unplanned breaks are the clearest sign of lost concentration, and the environment
- * shapes both.
+ * The model, in short:
+ *  - reaching the goal is the largest single factor;
+ *  - a very short session cannot score top marks however clean it was, because a few focused
+ *    minutes is not the habit the app exists to build;
+ *  - planned breaks are fine, but chopping a session into many of them is not;
+ *  - unplanned breaks cost in proportion to the time they actually consumed, so a brief
+ *    interruption is forgiven;
+ *  - handling the phone matters far more than noise, and noise more than dim light;
+ *  - a problem present only briefly is ignored entirely.
  */
 object LocalSessionRater {
+
+    // Points available.
+    private const val GOAL_POINTS = 60.0
+    private const val DISCIPLINE_POINTS = 15.0
+    private const val MOVEMENT_POINTS = 12.0
+    private const val NOISE_POINTS = 8.0
+    private const val LIGHT_POINTS = 5.0
+
+    // Penalties.
+    private const val MAX_UNPLANNED_PENALTY = 25.0
+    private const val EXCESS_PAUSE_PENALTY = 5.0
+    private const val MAX_EXCESS_PAUSE_PENALTY = 15.0
+
+    /** A problem present for less than this share of the session is not held against anyone. */
+    private const val ENVIRONMENT_GRACE = 0.2
+
+    /** Unplanned breaks shorter than this are treated as life, not lost focus. */
+    private const val UNPLANNED_GRACE_SECONDS = 120
 
     fun rate(summary: SessionSummary): SessionRating {
         val score = score(summary)
@@ -31,38 +56,68 @@ object LocalSessionRater {
     }
 
     fun score(summary: SessionSummary): Int {
-        // Reaching the goal is worth 60 of the 100 points, and overtime is not extra credit:
-        // the goal is the goal, and beating it is recognised in the wording instead.
-        val goalPoints = (summary.goalCompletion.coerceAtMost(1.0) * 60).roundToInt()
+        val goal = GOAL_POINTS * summary.goalCompletion.coerceAtMost(1.0)
 
-        // Each unplanned pause costs, with the first hurting most; a run of them is the
-        // signature of a session that never settled.
-        val unplannedPenalty = when (summary.unplannedPauseCount) {
-            0 -> 0
-            1 -> 8
-            2 -> 15
-            else -> 15 + (summary.unplannedPauseCount - 2) * 5
-        }.coerceAtMost(25)
-
-        // Taking the breaks that were planned is discipline, not weakness.
-        val disciplinePoints = if (summary.plannedPauseCount == 0) {
-            10
+        // Taking the breaks that were planned is discipline. Planning none is not a failing.
+        val discipline = if (summary.plannedPauseCount == 0) {
+            DISCIPLINE_POINTS
         } else {
             val ratio = summary.plannedPausesTaken.toDouble() / summary.plannedPauseCount
-            (ratio.coerceIn(0.0, 1.0) * 10).roundToInt()
+            DISCIPLINE_POINTS * ratio.coerceIn(0.0, 1.0)
         }
 
-        val environmentPoints = (
-            (1 - summary.darkFraction) * 10 +
-                (1 - summary.loudFraction) * 10 +
-                (1 - summary.movementFraction) * 10
-            ).roundToInt()
+        val environment =
+            MOVEMENT_POINTS * (1 - graced(summary.movementFraction)) +
+                NOISE_POINTS * (1 - graced(summary.loudFraction)) +
+                LIGHT_POINTS * (1 - graced(summary.darkFraction))
 
-        return (goalPoints + disciplinePoints + environmentPoints - unplannedPenalty)
-            .coerceIn(0, 100)
+        val raw = goal + discipline + environment -
+            unplannedPenalty(summary) -
+            excessPausePenalty(summary)
+
+        // However clean it was, a very short session is not evidence of sustained focus.
+        return raw.coerceIn(0.0, ceilingForLength(summary).toDouble()).roundToInt()
+    }
+
+    /** Nothing below the grace threshold counts; above it the excess scales to a full penalty. */
+    private fun graced(fraction: Double): Double =
+        ((fraction - ENVIRONMENT_GRACE) / (1 - ENVIRONMENT_GRACE)).coerceIn(0.0, 1.0)
+
+    /**
+     * Proportional to the share of desk time lost, after a short grace period: two minutes on
+     * a phone call in the middle of an hour is not a collapse of concentration. A count term
+     * catches sessions broken into many small pieces, which is worse than one longer break.
+     */
+    private fun unplannedPenalty(summary: SessionSummary): Double {
+        if (summary.unplannedPauseSeconds <= UNPLANNED_GRACE_SECONDS) return 0.0
+
+        val proportional = summary.unplannedShare * 50
+        val fragmentation = (summary.unplannedPauseCount - 2).coerceAtLeast(0) * 3.0
+        return (proportional + fragmentation).coerceAtMost(MAX_UNPLANNED_PENALTY)
+    }
+
+    /** Planned breaks are fine until there are more of them than the goal length warrants. */
+    private fun excessPausePenalty(summary: SessionSummary): Double =
+        (summary.excessPlannedPauses * EXCESS_PAUSE_PENALTY)
+            .coerceAtMost(MAX_EXCESS_PAUSE_PENALTY)
+
+    /**
+     * A ceiling rather than a deduction, so a four-minute session cannot reach 100 however
+     * spotless it was, while a genuinely long session is never capped.
+     */
+    private fun ceilingForLength(summary: SessionSummary): Int = when {
+        summary.focusedMinutes < 5 -> 60
+        summary.focusedMinutes < 10 -> 75
+        summary.focusedMinutes < 20 -> 90
+        else -> 100
     }
 
     private fun comment(summary: SessionSummary, score: Int): String = when {
+        summary.focusedMinutes < 5 -> "Far too short to build any real focus."
+
+        summary.excessPlannedPauses > 0 && score < 75 ->
+            "Broken into too many breaks to build momentum."
+
         summary.goalCompletion > 1.0 && summary.unplannedPauseCount == 0 ->
             "Exceptional — you went past your goal."
 
@@ -75,41 +130,46 @@ object LocalSessionRater {
 
     private fun analysis(summary: SessionSummary): String = buildString {
         append(
-            "You focused for ${summary.focusedDescription} of ${summary.goalMinutes} planned " +
-                "minutes"
+            "You focused for ${summary.focusedDescription} of ${summary.goalMinutes} " +
+                "planned minutes"
         )
+        append(if (summary.goalReached) ", meeting your goal. " else ", short of your goal. ")
+
+        if (summary.focusedMinutes < 10) {
+            append(
+                "That is a very short block — aim for at least 20 to 25 minutes before " +
+                    "stopping, since sustained focus is the whole point. "
+            )
+        }
+
+        if (summary.excessPlannedPauses > 0) {
+            append(
+                "You planned ${summary.plannedPauseCount} breaks for a " +
+                    "${summary.goalMinutes}-minute goal, which is more than it needs; about " +
+                    "${summary.reasonablePauseCount} would keep the momentum. "
+            )
+        }
+
+        when {
+            summary.unplannedPauseSeconds == 0 -> append("No unplanned pauses were recorded. ")
+            summary.unplannedPauseSeconds <= UNPLANNED_GRACE_SECONDS ->
+                append("One brief unplanned interruption is nothing to worry about. ")
+
+            else -> append(
+                "Unplanned pauses took ${summary.unplannedPauseMinutes} minutes, about " +
+                    "${(summary.unplannedShare * 100).roundToInt()}% of your time at the desk, " +
+                    "which is where the focus went. "
+            )
+        }
+
+        val problems = buildList {
+            if (graced(summary.movementFraction) > 0) add("the phone was handled repeatedly")
+            if (graced(summary.loudFraction) > 0) add("the room stayed noisy")
+            if (graced(summary.darkFraction) > 0) add("the light was poor for a long stretch")
+        }
         append(
-            if (summary.goalReached) ", meeting your goal. " else ", short of your goal. "
+            if (problems.isEmpty()) "Your working conditions held up well."
+            else "Worth fixing: ${problems.joinToString(", ")}."
         )
-
-        if (summary.plannedPauseCount > 0) {
-            append(
-                "You took ${summary.plannedPausesTaken} of ${summary.plannedPauseCount} " +
-                    "planned pauses. "
-            )
-        }
-
-        if (summary.unplannedPauseCount > 0) {
-            append(
-                "There ${if (summary.unplannedPauseCount == 1) "was" else "were"} " +
-                    "${summary.unplannedPauseCount} unplanned " +
-                    "${if (summary.unplannedPauseCount == 1) "pause" else "pauses"} " +
-                    "totalling ${summary.unplannedPauseMinutes} minutes, which is the " +
-                    "clearest sign of concentration breaking. "
-            )
-        } else {
-            append("No unplanned pauses were recorded. ")
-        }
-
-        val environment = buildList {
-            if (summary.darkFraction > 0.3) add("the room was dark for much of the session")
-            if (summary.loudFraction > 0.3) add("noise was a recurring problem")
-            if (summary.movementFraction > 0.2) add("the phone was handled repeatedly")
-        }
-        if (environment.isNotEmpty()) {
-            append("Environment: ${environment.joinToString(", ")}.")
-        } else {
-            append("Your working conditions stayed comfortable throughout.")
-        }
     }
 }

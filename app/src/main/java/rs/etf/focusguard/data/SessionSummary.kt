@@ -20,7 +20,7 @@ data class SessionSummary(
     val plannedPauseCount: Int,
     val plannedPausesTaken: Int,
     val unplannedPauseCount: Int,
-    val unplannedPauseMinutes: Int,
+    val unplannedPauseSeconds: Int,
     /** 0..1 fractions of stored samples that breached each threshold. */
     val darkFraction: Double,
     val loudFraction: Double,
@@ -51,6 +51,24 @@ data class SessionSummary(
     val goalCompletion: Double
         get() = if (goalSeconds <= 0) 1.0 else focusedSeconds.toDouble() / goalSeconds
 
+    val unplannedPauseMinutes: Int get() = unplannedPauseSeconds / 60
+
+    /** How much of the time at the desk was lost to unplanned breaks, 0..1. */
+    val unplannedShare: Double
+        get() {
+            val total = focusedSeconds + unplannedPauseSeconds
+            return if (total <= 0) 0.0 else unplannedPauseSeconds.toDouble() / total
+        }
+
+    /**
+     * Roughly one break per 20 minutes of goal is sensible. Beyond that the session is being
+     * chopped up, however deliberately.
+     */
+    val reasonablePauseCount: Int get() = maxOf(1, goalMinutes / 20)
+
+    val excessPlannedPauses: Int
+        get() = (plannedPauseCount - reasonablePauseCount).coerceAtLeast(0)
+
     companion object {
 
         fun from(item: SessionWithPauses, samples: List<SensorSample>): SessionSummary {
@@ -64,7 +82,7 @@ data class SessionSummary(
                 plannedPauseCount = session.plannedPauseCount,
                 plannedPausesTaken = item.pauses.count { it.type == PauseType.PLANNED },
                 unplannedPauseCount = unplanned.size,
-                unplannedPauseMinutes = unplanned.sumOf { it.durationSeconds } / 60,
+                unplannedPauseSeconds = unplanned.sumOf { it.durationSeconds },
                 darkFraction = samples.fractionOf(SensorKind.LIGHT) {
                     it < EnvironmentThresholds.DARK_LUX
                 },

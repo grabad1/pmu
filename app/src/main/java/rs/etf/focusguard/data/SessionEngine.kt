@@ -6,7 +6,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -44,6 +46,14 @@ class SessionEngine @Inject constructor(
 
     private val _state = MutableStateFlow<SessionRuntimeState?>(null)
     val state = _state.asStateFlow()
+
+    /** Emits a session id once it has been stored and rated, so the UI can show the result. */
+    private val _ratedSessions = MutableSharedFlow<Long>(extraBufferCapacity = 4)
+    val ratedSessions = _ratedSessions.asSharedFlow()
+
+    /** Emits as soon as a session ends, before the rating is known. */
+    private val _finishedSessions = MutableSharedFlow<Long>(extraBufferCapacity = 4)
+    val finishedSessions = _finishedSessions.asSharedFlow()
 
     private var ticker: Job? = null
 
@@ -161,6 +171,7 @@ class SessionEngine @Inject constructor(
         ticker = null
         _state.value = null
         Log.d(LOG_TAG, "SessionEngine.endSession(${ended.id}) focused=${ended.focusedSeconds}")
+        _finishedSessions.tryEmit(ended.id)
 
         // Rating runs after the session is stored and the UI has been released, so a slow
         // network cannot hold up leaving the timer screen.
@@ -175,6 +186,7 @@ class SessionEngine @Inject constructor(
         val rating = ratingRepository.rate(summary)
         repository.saveRating(sessionId, rating)
         Log.d(LOG_TAG, "Rated session $sessionId: ${rating.score} — ${rating.comment}")
+        _ratedSessions.tryEmit(sessionId)
     }
 
     private fun startTicking() {

@@ -132,4 +132,9 @@
         <item quantity="other">\"%1$s\" was due %2$d minutes ago. Start it now?</item>
     </plurals>
     <string name="action_join_session">Join Session</string>
+
+    <!-- Session result -->
+    <string name="result_dialog_title">Session Complete</string>
+    <string name="result_dialog_focused">Focused %1$s of a %2$d minute goal.</string>
+    <string name="result_dialog_analysing">Analysing your session…</string>
 </resources>
