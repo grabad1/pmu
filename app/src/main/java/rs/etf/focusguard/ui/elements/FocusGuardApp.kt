@@ -22,6 +22,8 @@ import rs.etf.focusguard.ui.elements.screens.HomeScreen
 import rs.etf.focusguard.ui.elements.screens.NewSessionScreen
 import rs.etf.focusguard.ui.elements.screens.PreviousSessionsScreen
 import rs.etf.focusguard.ui.elements.screens.ScheduledSessionsScreen
+import rs.etf.focusguard.util.navigateSafely
+import rs.etf.focusguard.util.popBackStackSafely
 
 @Composable
 fun FocusGuardApp() {
@@ -39,27 +41,27 @@ fun FocusGuardApp() {
         ) {
             composable<Home> {
                 HomeScreen(
-                    onNewSession = { navController.navigate(NewSession) },
-                    onScheduledSessions = { navController.navigate(ScheduledSessions) },
-                    onPreviousSessions = { navController.navigate(PreviousSessions) },
+                    onNewSession = { navController.navigateSafely(NewSession) },
+                    onScheduledSessions = { navController.navigateSafely(ScheduledSessions) },
+                    onPreviousSessions = { navController.navigateSafely(PreviousSessions) },
                 )
             }
             composable<NewSession> {
                 NewSessionScreen(
-                    onBack = { navController.popBackStack() },
-                    onStart = { navController.navigate(ActiveSession) },
+                    onBack = { navController.popBackStackSafely() },
+                    onStart = { navController.navigateSafely(ActiveSession) },
                 )
             }
             composable<ScheduledSessions> {
-                ScheduledSessionsScreen(onBack = { navController.popBackStack() })
+                ScheduledSessionsScreen(onBack = { navController.popBackStackSafely() })
             }
             composable<PreviousSessions> {
-                PreviousSessionsScreen(onBack = { navController.popBackStack() })
+                PreviousSessionsScreen(onBack = { navController.popBackStackSafely() })
             }
             composable<ActiveSession> {
                 ActiveSessionScreen(
                     onFinished = {
-                        navController.popBackStack(Home, inclusive = false)
+                        navController.popBackStackSafely(Home, inclusive = false)
                     },
                 )
             }
