@@ -13,6 +13,64 @@
     <string name="scheduled_sessions_title">Scheduled Sessions</string>
     <string name="previous_sessions_title">Previous Sessions</string>
 
-    <!-- Common -->
+    <!-- Form -->
+    <string name="field_session_name">Session Name</string>
+    <string name="field_session_name_hint">e.g. Deep Work Block</string>
+    <string name="field_schedule_name_hint">e.g. Morning Focus</string>
+    <string name="field_goal_time">Goal Time (minutes)</string>
+    <string name="field_pauses">Pauses</string>
+    <string name="field_pause_duration">Pause Duration (min)</string>
+    <string name="field_date">Date</string>
+    <string name="field_time">Time</string>
+
+    <!-- Actions -->
+    <string name="action_start">▶  Start</string>
+    <string name="action_schedule">Schedule</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_close">Close</string>
+    <string name="action_ok">OK</string>
     <string name="back">Back</string>
+
+    <!-- Scheduling -->
+    <string name="schedule_dialog_title">Schedule Session</string>
+    <string name="schedule_existing">Existing sessions:</string>
+    <string name="schedule_conflict">Conflicts with \"%1$s\".</string>
+    <string name="schedule_confirmation">\"%1$s\" scheduled!</string>
+    <string name="scheduled_empty">No sessions scheduled yet.</string>
+
+    <!-- Card details -->
+    <string name="detail_goal_time">Goal Time</string>
+    <string name="detail_planned_total">Planned Total</string>
+    <string name="detail_pauses">Pauses</string>
+    <string name="detail_pause_duration">Pause Duration</string>
+    <string name="detail_actual_time">Actual Time</string>
+    <string name="value_minutes">%1$d min</string>
+    <string name="value_minutes_over">%1$d min  🔵</string>
+    <string name="value_minutes_each">%1$d min each</string>
+    <plurals name="value_pauses">
+        <item quantity="one">%1$d pause</item>
+        <item quantity="other">%1$d pauses</item>
+    </plurals>
+    <plurals name="value_pauses_tap">
+        <item quantity="one">%1$d pause — tap to view ↗</item>
+        <item quantity="other">%1$d pauses — tap to view ↗</item>
+    </plurals>
+    <string name="previous_card_footer">Tap card for AI analysis</string>
+    <string name="previous_empty">No finished sessions yet.\nStart one to see it here.</string>
+
+    <!-- Pause log -->
+    <string name="pause_log_title">Pause Log</string>
+    <string name="pause_log_empty">No pauses recorded.</string>
+    <string name="pause_log_item">Pause %1$d</string>
+    <string name="pause_log_duration">Duration:</string>
+    <string name="pause_log_time">Time:</string>
+    <string name="pause_planned">planned</string>
+    <string name="pause_unplanned">unplanned</string>
+
+    <!-- Analysis -->
+    <string name="analysis_pending_comment">Not analysed yet.</string>
+    <string name="analysis_pending_detail">This session has not been rated. AI analysis arrives in a later build.</string>
+
+    <!-- Active session -->
+    <string name="session_timer_pending">The live timer, progress ring and pause controls arrive in Phase 3.</string>
 </resources>

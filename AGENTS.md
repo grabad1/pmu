@@ -166,6 +166,22 @@ coordinates back up before `adb shell input tap`.
 **The microphone cannot be injected on the emulator.** Keep loudness detection behind
 an interface, fake it in unit tests, and have the user verify on a real device.
 
+### Seeding demo data
+
+The emulator ships `sqlite3`, so sample sessions can be inserted straight into the live
+database without adding seed code to the app:
+
+```powershell
+$adb shell "run-as rs.etf.focusguard sqlite3 databases/focus_guard_database 'SELECT id,name FROM sessions;'"
+```
+
+Write multi-statement SQL to a file, `adb push` it to `/data/local/tmp`, then
+`run-as ... sh -c 'cat <file> | sqlite3 databases/focus_guard_database'`. Quoting nested
+SQL inline through PowerShell and `adb shell` is unreliable; the file route is not.
+
+Note the emulator's IME may interrupt `input text` with a stylus tutorial. Dismiss it
+once with `settings put secure stylus_handwriting_enabled 0`.
+
 ## Data model
 
 Three tables, all in `data/room`:
@@ -202,7 +218,7 @@ $env:JAVA_HOME="$env:USERPROFILE\.jdks\jbr-21.0.11"
 |---|---|---|
 | 0 | Scaffold: Gradle, theme, nav skeleton | ✅ done |
 | 1 | Room entities, DAOs, repository | ✅ done |
-| 2 | Real screens: forms, lists, modals, conflict detection | |
+| 2 | Real screens: forms, lists, modals, conflict detection | ✅ done |
 | 3 | Foreground service: timer, pauses, overtime | |
 | 4 | Sensors → warning engine | |
 | 5 | AlarmManager scheduling + notifications | |
