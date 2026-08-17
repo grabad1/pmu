@@ -129,10 +129,39 @@ Patterns to follow:
 
 ## Secrets
 
-The OpenAI key lives in `local.properties` as `OPENAI_API_KEY=...` and is surfaced
-through `BuildConfig.OPENAI_API_KEY`. `local.properties` is git-ignored.
+The AI key lives in `local.properties` as `GEMINI_API_KEY=...` and is surfaced through
+`BuildConfig.GEMINI_API_KEY`. `local.properties` is git-ignored.
 
-**The GitHub repo is public — never commit the key, and never paste it into chat.**
+**The GitHub repo is public — never commit the key, never paste it into chat, and never print
+the contents of `local.properties` to a terminal.** OkHttp logging is pinned to `BASIC` for the
+same reason: `BODY` would put the key's header into logcat.
+
+## AI session rating
+
+On session end, `SessionEngine` builds a `SessionSummary` — goal, focus time, planned versus
+unplanned pauses, and the share of readings that were dark, loud or moving — and asks
+`SessionRatingRepository` for a score, a one-line comment and a short analysis.
+
+- **Gemini (`gemini-3.6-flash`) on the free tier**, chosen because it needs no card. The key
+  travels in the `x-goog-api-key` header, never a query parameter.
+- **A rating is always produced.** No key, no network, an exhausted quota or a malformed reply
+  all fall back to `LocalSessionRater`, so a session the user completed is never left unscored
+  for reasons outside their control.
+- `responseMimeType: application/json` makes the model return structured output, so the score is
+  parsed rather than scraped out of prose.
+- The local score is deliberately **not** sent in the prompt — an independent judgement is more
+  useful than a rubber stamp.
+- Rating runs after the session is stored and the UI released, so a slow network never delays
+  leaving the timer screen.
+
+Two things found by running it for real:
+
+- `maxOutputTokens` of 400 returned **truncated JSON**. Current flash models spend part of the
+  output budget on internal reasoning; it is now 2000.
+- Durations must never be reported to the model in whole minutes. A 52-second session became
+  "0 minutes", and the model correctly concluded no focus had happened and scored it zero.
+  `SessionSummary.focusedDescription` plus a percentage of goal are sent instead, and scoring
+  works in seconds throughout.
 
 ## Environment (this machine)
 
@@ -330,7 +359,7 @@ Restore the clock afterwards with the host time, or the app's own scheduling loo
 | 3 | Foreground service: timer, pauses, overtime | ✅ done |
 | 4 | Sensors → warning engine | ✅ done |
 | 5 | AlarmManager scheduling + notifications | ✅ done |
-| 6 | OpenAI rating | |
+| 6 | AI rating | ✅ done |
 | 7 | Landscape, animations, polish | |
 
 ## Known issues

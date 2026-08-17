@@ -37,6 +37,7 @@ import javax.inject.Singleton
 @Singleton
 class SessionEngine @Inject constructor(
     private val repository: SessionRepository,
+    private val ratingRepository: SessionRatingRepository,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val mutex = Mutex()
@@ -160,6 +161,20 @@ class SessionEngine @Inject constructor(
         ticker = null
         _state.value = null
         Log.d(LOG_TAG, "SessionEngine.endSession(${ended.id}) focused=${ended.focusedSeconds}")
+
+        // Rating runs after the session is stored and the UI has been released, so a slow
+        // network cannot hold up leaving the timer screen.
+        scope.launch { rate(ended.id) }
+    }
+
+    private suspend fun rate(sessionId: Long) {
+        val withPauses = repository.getSessionWithPauses(sessionId) ?: return
+        val samples = repository.getSensorSamples(sessionId)
+        val summary = SessionSummary.from(withPauses, samples)
+
+        val rating = ratingRepository.rate(summary)
+        repository.saveRating(sessionId, rating)
+        Log.d(LOG_TAG, "Rated session $sessionId: ${rating.score} — ${rating.comment}")
     }
 
     private fun startTicking() {

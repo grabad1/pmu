@@ -84,6 +84,18 @@ class SessionRepository @Inject constructor(
     suspend fun getSensorSamples(sessionId: Long): List<SensorSample> =
         sensorSampleDao.getBySession(sessionId)
 
+    /** Stores the rating produced for a finished session. */
+    suspend fun saveRating(sessionId: Long, rating: SessionRating) {
+        val session = sessionDao.getById(sessionId) ?: return
+        sessionDao.update(
+            session.copy(
+                focusScore = rating.score,
+                aiComment = rating.comment,
+                aiAnalysis = rating.analysis,
+            )
+        )
+    }
+
     suspend fun getSensorSamples(sessionId: Long, kind: SensorKind): List<SensorSample> =
         sensorSampleDao.getBySessionAndKind(sessionId, kind)
 
