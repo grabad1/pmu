@@ -238,6 +238,30 @@ Key decisions, each of which fixed a real bug during Phase 3:
 Foreground service type is `specialUse` (there is no timer type, and `shortService` caps at
 a few minutes). Phase 4 should add `microphone` once loudness monitoring lands.
 
+## Environment monitoring
+
+`EnvironmentMonitor` turns readings into warnings; the sensors themselves are lifecycle-aware
+observers attached to `FocusSessionService`, so they are unregistered when the session ends.
+
+- **Conditions are judged on a 1 s timer, not per reading.** `TYPE_LIGHT` is an *on-change*
+  sensor: once the room is dark it reports once and goes quiet, so a sustain window driven by
+  readings alone never elapses. Readings only update "latest"; the timer decides.
+- **Non-finite readings are dropped.** SQLite has no NaN — Android binds it as NULL, which
+  violates the non-null `value` column and crashes the insert. A physically impossible sensor
+  injection (`acceleration 0:0:0`) produced NaN through sensor fusion and found this.
+- **Nothing is judged while paused.** Using the phone during a break is expected.
+- Thresholds and sustain/cooldown windows live in `EnvironmentThresholds`, and the debounce
+  rules are in `ConditionTracker`, which is clock-free and unit-tested.
+- Movement is the only full-screen interruption; light and noise are toasts.
+
+Current thresholds: dark below 15 lux for 20 s, loud above 70 dB for 15 s, movement above
+2.5 m/s² for 2 s, each with a 120 s cooldown. Samples are stored every 10 s.
+
+**Noise is unverified.** The emulator's microphone only ever returns silence, so
+`MicrophoneNoiseSource` has never produced a non-zero reading. It sits behind the `NoiseSource`
+interface for that reason. The dB figure is relative, not calibrated SPL, so the 70 dB
+threshold will need tuning against a real device.
+
 ## Build phases
 
 | # | Phase | State |
@@ -246,7 +270,7 @@ a few minutes). Phase 4 should add `microphone` once loudness monitoring lands.
 | 1 | Room entities, DAOs, repository | ✅ done |
 | 2 | Real screens: forms, lists, modals, conflict detection | ✅ done |
 | 3 | Foreground service: timer, pauses, overtime | ✅ done |
-| 4 | Sensors → warning engine | |
+| 4 | Sensors → warning engine | ✅ done |
 | 5 | AlarmManager scheduling + notifications | |
 | 6 | OpenAI rating | |
 | 7 | Landscape, animations, polish | |

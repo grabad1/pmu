@@ -40,9 +40,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import rs.etf.focusguard.R
 import rs.etf.focusguard.data.SessionRuntimeState
 import rs.etf.focusguard.data.room.PauseType
+import rs.etf.focusguard.sensors.WarningKind
+import rs.etf.focusguard.ui.elements.composables.BigWarningOverlay
 import rs.etf.focusguard.ui.elements.composables.DialogButton
 import rs.etf.focusguard.ui.elements.composables.DialogButtonStyle
 import rs.etf.focusguard.ui.elements.composables.FocusGuardDialog
+import rs.etf.focusguard.ui.elements.composables.WarningToastData
+import rs.etf.focusguard.ui.elements.composables.WarningToastHost
 import rs.etf.focusguard.ui.elements.theme.Accent
 import rs.etf.focusguard.ui.elements.theme.Blue
 import rs.etf.focusguard.ui.elements.theme.Card2
@@ -59,6 +63,8 @@ fun ActiveSessionScreen(
     viewModel: ActiveSessionViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val toasts by viewModel.toasts.collectAsStateWithLifecycle()
+    val showBigWarning by viewModel.showBigWarning.collectAsStateWithLifecycle()
     var showEndDialog by remember { mutableStateOf(false) }
     var hasSeenSession by remember { mutableStateOf(false) }
 
@@ -71,20 +77,34 @@ fun ActiveSessionScreen(
 
     val current = state ?: return
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(bottom = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween,
-    ) {
-        SessionHeader(current)
-        SessionDial(current)
-        SessionControls(
-            state = current,
-            onTogglePause = viewModel::togglePause,
-            onEndRequested = { showEndDialog = true },
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            SessionHeader(current)
+            SessionDial(current)
+            SessionControls(
+                state = current,
+                onTogglePause = viewModel::togglePause,
+                onEndRequested = { showEndDialog = true },
+            )
+        }
+
+        WarningToastHost(
+            toasts = toasts.map { it.id to it.kind.toToastData() },
+            onDismiss = viewModel::dismissToast,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 6.dp),
         )
+
+        if (showBigWarning) {
+            BigWarningOverlay(onDismiss = viewModel::dismissBigWarning)
+        }
     }
 
     if (showEndDialog) {
@@ -361,4 +381,11 @@ private fun SessionRuntimeState.statusText(): String = when {
     activePauseType == PauseType.UNPLANNED -> stringResource(R.string.session_on_unplanned_pause)
     isPastGoal -> stringResource(R.string.session_past_goal)
     else -> stringResource(R.string.session_focusing)
+}
+
+private fun WarningKind.toToastData(): WarningToastData = when (this) {
+    WarningKind.BAD_LIGHT -> WarningToastData("💡", R.string.warning_bad_light)
+    WarningKind.LOUD_ROOM -> WarningToastData("🔊", R.string.warning_loud_room)
+    // Movement is shown full screen; this exists only for exhaustiveness.
+    WarningKind.MOVEMENT -> WarningToastData("🚫", R.string.warning_movement_toast)
 }

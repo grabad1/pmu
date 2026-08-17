@@ -1,9 +1,11 @@
 package rs.etf.focusguard
 
+import android.Manifest
 import android.app.Notification
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
@@ -20,9 +22,12 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import rs.etf.focusguard.data.SessionEngine
-import rs.etf.focusguard.data.SessionRepository
 import rs.etf.focusguard.data.SessionRuntimeState
 import rs.etf.focusguard.data.room.PauseType
+import rs.etf.focusguard.sensors.EnvironmentMonitor
+import rs.etf.focusguard.sensors.LightLifecycleAwareMonitor
+import rs.etf.focusguard.sensors.MotionLifecycleAwareMonitor
+import rs.etf.focusguard.sensors.NoiseLifecycleAwareMonitor
 import rs.etf.focusguard.util.formatHoursMinutesSeconds
 import javax.inject.Inject
 
@@ -60,6 +65,18 @@ class FocusSessionService : LifecycleService() {
     @Inject
     lateinit var sessionEngine: SessionEngine
 
+    @Inject
+    lateinit var environmentMonitor: EnvironmentMonitor
+
+    @Inject
+    lateinit var lightMonitor: LightLifecycleAwareMonitor
+
+    @Inject
+    lateinit var motionMonitor: MotionLifecycleAwareMonitor
+
+    @Inject
+    lateinit var noiseMonitor: NoiseLifecycleAwareMonitor
+
     private var isObservingState = false
 
     /**
@@ -72,6 +89,18 @@ class FocusSessionService : LifecycleService() {
         super.onCreate()
         Log.d(LOG_TAG, "FocusSessionService.onCreate()")
         createNotificationChannel()
+
+        // Sensors are tied to the service lifecycle, so they are registered and unregistered
+        // exactly once and cannot outlive the session.
+        environmentMonitor.start()
+        lifecycle.addObserver(lightMonitor)
+        lifecycle.addObserver(motionMonitor)
+        lifecycle.addObserver(noiseMonitor)
+    }
+
+    override fun onDestroy() {
+        environmentMonitor.stop()
+        super.onDestroy()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -140,16 +169,26 @@ class FocusSessionService : LifecycleService() {
     }
 
     private fun startForegroundCompat(notification: Notification) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            ServiceCompat.startForeground(
-                this,
-                NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
-            )
-        } else {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(NOTIFICATION_ID, notification)
+            return
         }
+
+        // Declaring the microphone type without the permission is rejected outright, so the
+        // type is chosen from what has actually been granted.
+        val canUseMicrophone = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.RECORD_AUDIO,
+        ) == PackageManager.PERMISSION_GRANTED
+
+        val type = if (canUseMicrophone) {
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+        } else {
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+        }
+
+        ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, type)
     }
 
     private fun createNotificationChannel() {

@@ -16,13 +16,13 @@ import rs.etf.focusguard.ui.elements.theme.FocusGuardTheme
 @AndroidEntryPoint
 class FocusGuardActivity : ComponentActivity() {
 
-    private val requestNotificationPermission =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    private val requestPermissions =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        askForNotificationPermission()
+        askForPermissions()
         setContent {
             FocusGuardTheme {
                 FocusGuardApp()
@@ -31,18 +31,22 @@ class FocusGuardActivity : ComponentActivity() {
     }
 
     /**
-     * The session runs in a foreground service, which is only visible to the user through
-     * its notification. Asking up front avoids a session that appears to vanish when the
-     * app is backgrounded.
+     * Notifications carry the session timer while the app is backgrounded, and the microphone
+     * drives loudness detection. Neither is required for the app to run — a denied microphone
+     * simply disables noise warnings — so the result is not acted upon.
      */
-    private fun askForNotificationPermission() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+    private fun askForPermissions() {
+        val wanted = buildList {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            add(Manifest.permission.RECORD_AUDIO)
+        }
 
-        val granted = ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.POST_NOTIFICATIONS,
-        ) == PackageManager.PERMISSION_GRANTED
+        val missing = wanted.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
 
-        if (!granted) requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        if (missing.isNotEmpty()) requestPermissions.launch(missing.toTypedArray())
     }
 }

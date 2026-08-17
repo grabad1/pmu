@@ -1,0 +1,48 @@
+package rs.etf.focusguard.sensors
+
+/**
+ * Environment problems the app reacts to during a session.
+ *
+ * Only [MOVEMENT] is serious enough to interrupt with a full-screen warning, because picking
+ * the phone up is the failure mode the app exists to prevent. The others are advisory and
+ * appear as toasts.
+ */
+enum class WarningKind {
+    MOVEMENT,
+    BAD_LIGHT,
+    LOUD_ROOM,
+}
+
+/**
+ * Thresholds are gathered here rather than scattered through the monitors, so they can be
+ * tuned against real-world readings without touching logic.
+ *
+ * Sustain windows exist because momentary spikes are normal: a hand passing over the sensor,
+ * a door closing, setting the phone down. A condition has to persist to count.
+ */
+object EnvironmentThresholds {
+
+    /** Below this a desk is too dim for sustained work; a dim room reads 30-80 lux. */
+    const val DARK_LUX = 15f
+    const val DARK_SUSTAIN_SECONDS = 20L
+
+    /**
+     * Relative loudness, not calibrated SPL — the microphone reports amplitude, which is only
+     * meaningful against itself. Roughly "clearly louder than a quiet room".
+     */
+    const val LOUD_DB = 70f
+    const val LOUD_SUSTAIN_SECONDS = 15L
+
+    /**
+     * Linear acceleration excludes gravity, so a phone lying still reads near zero. Picking
+     * it up comfortably exceeds this; typing beside it does not.
+     */
+    const val MOVEMENT_MS2 = 2.5f
+    const val MOVEMENT_SUSTAIN_SECONDS = 2L
+
+    /** Repeating the same warning is just noise, so each kind has a cooldown. */
+    const val COOLDOWN_SECONDS = 120L
+
+    /** How often readings are stored, so a session yields useful history without bloat. */
+    const val SAMPLE_EVERY_SECONDS = 10L
+}
