@@ -77,12 +77,18 @@ features anyway).
 Build from the CLI with:
 
 ```powershell
-$env:JAVA_HOME="$env:LOCALAPPDATA\Programs\jdk-21.0.12+8"
+$env:JAVA_HOME="$env:USERPROFILE\.jdks\jbr-21.0.11"
 .\gradlew.bat :app:assembleDebug
 ```
 
-In Android Studio: **Settings → Build, Execution, Deployment → Build Tools → Gradle →
-Gradle JDK** → point at that JDK 21.
+That is the JDK 21 Android Studio downloaded for itself. Using the same one from the
+CLI means Studio and the agent share a single Gradle daemon instead of running two
+(~2 GB each).
+
+In Android Studio the JDK is already set (**Settings → Build, Execution, Deployment →
+Build Tools → Gradle → Gradle JDK**). Studio records it in `.gradle/config.properties`
+as `java.home`, which is git-ignored and machine-local — the CLI wrapper does *not*
+read that file, hence the explicit `JAVA_HOME` above.
 
 **Decline every Android Studio prompt to upgrade AGP/Gradle.** Accepting on one machine
 is the usual way a project stops opening on the other.
@@ -132,7 +138,9 @@ through `BuildConfig.OPENAI_API_KEY`. `local.properties` is git-ignored.
 
 - Repo: `D:\PMU\pmu` → `github.com/grabad1/pmu`. Run the agent from the repo root.
 - Android SDK: `%LOCALAPPDATA%\Android\Sdk` (platform 36, build-tools 36.0.0)
-- JDK 21: `%LOCALAPPDATA%\Programs\jdk-21.0.12+8`
+- JDK 21: `%USERPROFILE%\.jdks\jbr-21.0.11` (downloaded by Studio; used by both
+  Studio and the CLI). A second Temurin 21 sits at `%LOCALAPPDATA%\Programs\jdk-21.0.12+8`
+  as a fallback and is otherwise unused.
 - Emulator AVD: **`FocusGuard_API36`** (Pixel 7, API 36, x86_64, google_apis)
 
 ### Agent testing loop
