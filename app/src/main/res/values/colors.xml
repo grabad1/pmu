@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Palette ported verbatim from the index.html prototype. -->
+    <color name="bg">#08080C</color>
+    <color name="surface">#111116</color>
+    <color name="accent">#FF5500</color>
+    <color name="ic_launcher_background">#08080C</color>
+</resources>

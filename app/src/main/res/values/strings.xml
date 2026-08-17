@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Focus Guard</string>
+    <string name="app_tagline">Stay in the zone.</string>
+
+    <!-- Home -->
+    <string name="home_new_session">New Session</string>
+    <string name="home_scheduled_sessions">Scheduled Sessions</string>
+    <string name="home_previous_sessions">Previous Sessions</string>
+
+    <!-- Screen titles -->
+    <string name="new_session_title">New Session</string>
+    <string name="scheduled_sessions_title">Scheduled Sessions</string>
+    <string name="previous_sessions_title">Previous Sessions</string>
+
+    <!-- Common -->
+    <string name="back">Back</string>
+</resources>
