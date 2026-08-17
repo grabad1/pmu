@@ -166,12 +166,42 @@ coordinates back up before `adb shell input tap`.
 **The microphone cannot be injected on the emulator.** Keep loudness detection behind
 an interface, fake it in unit tests, and have the user verify on a real device.
 
+## Data model
+
+Three tables, all in `data/room`:
+
+- **`sessions`** — one row per session, scheduled or run. `focusedSeconds` counts *focus*
+  time only (pauses excluded) so it compares directly against `goalMinutes`, and is allowed
+  to exceed it because overtime is a success state. AI results (`focusScore`, `aiComment`,
+  `aiAnalysis`) are null until Phase 6 fills them in.
+- **`pauses`** — `PLANNED` or `UNPLANNED`, cascade-deleted with the session.
+  `startOffsetSeconds` is the *focus* offset at which the pause began, which is what the
+  pause log displays; it is not derivable from `startedAt`, since earlier pauses shift
+  wall-clock time away from focus time.
+- **`sensor_samples`** — raw periodic readings (lux / dB / m·s⁻²). Raw values are stored
+  rather than verdicts so thresholds can be retuned later without invalidating history.
+
+Conflict detection lives in SQL (`SessionDao.findScheduledOverlapping`): a scheduled
+session occupies `scheduledAt .. scheduledAt + (goal + count × pauseMinutes)` minutes.
+Adjacent sessions that merely touch do not count as overlapping.
+
+Planned pause offsets come from `util/plannedPauseOffsetsSeconds`, unit-tested in
+`PauseScheduleTest`.
+
+## Testing
+
+```powershell
+$env:JAVA_HOME="$env:USERPROFILE\.jdks\jbr-21.0.11"
+.\gradlew.bat :app:testDebugUnitTest          # pure logic, no device
+.\gradlew.bat :app:connectedDebugAndroidTest  # Room tests, needs the emulator running
+```
+
 ## Build phases
 
 | # | Phase | State |
 |---|---|---|
 | 0 | Scaffold: Gradle, theme, nav skeleton | ✅ done |
-| 1 | Room entities, DAOs, repository | |
+| 1 | Room entities, DAOs, repository | ✅ done |
 | 2 | Real screens: forms, lists, modals, conflict detection | |
 | 3 | Foreground service: timer, pauses, overtime | |
 | 4 | Sensors → warning engine | |
