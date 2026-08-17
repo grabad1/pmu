@@ -26,3 +26,6 @@ output.json
 *.log
 .DS_Store
 Thumbs.db
+
+# Personal working notes — memory across sessions, not part of the project
+notes/

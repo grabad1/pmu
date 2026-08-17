@@ -2,6 +2,11 @@
 
 Personal Android project. Not related to any other repo, internship, or work project.
 
+> **Read `notes/` first.** `notes/SESSION-LOG.md` records what has been decided and why, every
+> bug found so far, and how the user prefers to work; `notes/STATE.md` is a snapshot of where
+> things stand and what to do next. The folder is git-ignored — it is working memory, not part
+> of the project.
+
 ## What this app is
 
 A **focus/productivity Android app**. The user starts a timed focus session; the app
