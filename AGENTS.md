@@ -286,6 +286,40 @@ warning appears not to work when tested by hand.
 interface for that reason. The dB figure is relative, not calibrated SPL, so the 70 dB
 threshold will need tuning against a real device.
 
+## Scheduled session reminders
+
+`SessionAlarmScheduler` books three exact alarms per scheduled session — one hour before,
+five minutes before, and at the start — which `SessionAlarmReceiver` turns into notifications.
+
+- **`AlarmManager`, not `WorkManager`.** WorkManager is deliberately inexact and Doze can
+  defer it by many minutes, which would make "five minutes before" meaningless.
+  `setExactAndAllowWhileIdle` is the only variant that survives Doze.
+- **Each reminder is its own alarm** with a distinct `data` URI. Extras are *not* part of a
+  `PendingIntent`'s identity, so without the URI all three would collapse into one.
+- **The receiver re-reads the session** rather than trusting the intent, so a reminder for a
+  session since cancelled, started or rescheduled is dropped.
+- `BootCompletedReceiver` re-books everything after a restart, since Android drops all alarms
+  on reboot.
+- Cancelling a scheduled session cancels its alarms; they outlive the row otherwise.
+
+The "Session Starting!" prompt is driven by the clock and the stored schedule, not by the
+notification, so it appears whether or not the notification was seen. A session counts as due
+from 5 minutes before until 15 minutes after its start.
+
+### Testing alarms on the emulator
+
+`am broadcast -a BOOT_COMPLETED` is rejected (system-only). To watch reminders fire, move the
+device clock instead:
+
+```powershell
+adb root
+adb shell "toybox date -s '2026-08-17 21:54:45'"   # `date <MMDDhhmm>` is rejected; use toybox
+adb shell dumpsys alarm | Select-String focusguard  # confirm trigger times and exactness
+adb unroot
+```
+
+Restore the clock afterwards with the host time, or the app's own scheduling looks broken.
+
 ## Build phases
 
 | # | Phase | State |
@@ -295,7 +329,7 @@ threshold will need tuning against a real device.
 | 2 | Real screens: forms, lists, modals, conflict detection | ✅ done |
 | 3 | Foreground service: timer, pauses, overtime | ✅ done |
 | 4 | Sensors → warning engine | ✅ done |
-| 5 | AlarmManager scheduling + notifications | |
+| 5 | AlarmManager scheduling + notifications | ✅ done |
 | 6 | OpenAI rating | |
 | 7 | Landscape, animations, polish | |
 

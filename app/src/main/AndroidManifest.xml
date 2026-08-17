@@ -7,6 +7,15 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!--
+      Reminders are only useful if they are punctual, so exact alarms are required.
+      USE_EXACT_ALARM is granted at install for apps whose core function is user-set timing;
+      SCHEDULE_EXACT_ALARM is the requestable fallback on Android 12.
+    -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <!-- The app degrades gracefully without any of these, so none is required. -->
     <uses-feature android:name="android.hardware.sensor.light" android:required="false" />
     <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />
@@ -41,6 +50,19 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Times a user-started focus session and watches the environment for conditions that break concentration. The session must keep running with the screen off, so it cannot be a short service." />
         </service>
+
+        <receiver
+            android:name=".alarms.SessionAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".alarms.BootCompletedReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
     </application>
 

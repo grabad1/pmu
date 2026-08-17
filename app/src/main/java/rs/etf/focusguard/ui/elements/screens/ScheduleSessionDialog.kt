@@ -3,15 +3,22 @@ package rs.etf.focusguard.ui.elements.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Keyboard
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimeInput
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
@@ -33,6 +40,7 @@ import rs.etf.focusguard.ui.elements.composables.DialogButtonStyle
 import rs.etf.focusguard.ui.elements.composables.FocusGuardDialog
 import rs.etf.focusguard.ui.elements.composables.FormField
 import rs.etf.focusguard.ui.elements.composables.FormLabel
+import rs.etf.focusguard.ui.elements.theme.Accent
 import rs.etf.focusguard.ui.elements.theme.Border
 import rs.etf.focusguard.ui.elements.theme.Card
 import rs.etf.focusguard.ui.elements.theme.Red
@@ -156,6 +164,7 @@ fun ScheduleSessionDialog(
             initialMinute = uiState.scheduleMinute,
             is24Hour = true,
         )
+        var useTextInput by remember { mutableStateOf(false) }
 
         Dialog(onDismissRequest = { showTimePicker = false }) {
             Surface(
@@ -166,13 +175,38 @@ fun ScheduleSessionDialog(
                     modifier = Modifier.padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    TimePicker(state = timePickerState)
+                    if (useTextInput) {
+                        TimeInput(state = timePickerState)
+                    } else {
+                        TimePicker(state = timePickerState)
+                    }
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 8.dp),
-                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        // Typing a time is faster than dragging a dial when the exact
+                        // minute matters, which for scheduling it usually does.
+                        IconButton(onClick = { useTextInput = !useTextInput }) {
+                            Icon(
+                                imageVector = if (useTextInput) {
+                                    Icons.Outlined.Schedule
+                                } else {
+                                    Icons.Outlined.Keyboard
+                                },
+                                contentDescription = stringResource(
+                                    if (useTextInput) {
+                                        R.string.action_pick_time_on_dial
+                                    } else {
+                                        R.string.action_type_time
+                                    }
+                                ),
+                                tint = Accent,
+                            )
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
                         TextButton(onClick = { showTimePicker = false }) {
                             Text(stringResource(R.string.action_cancel))
                         }

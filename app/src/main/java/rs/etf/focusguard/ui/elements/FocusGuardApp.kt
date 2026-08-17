@@ -37,6 +37,7 @@ import rs.etf.focusguard.R
 import rs.etf.focusguard.ScheduledSessions
 import rs.etf.focusguard.ui.elements.screens.ActiveSessionScreen
 import rs.etf.focusguard.ui.elements.screens.HomeScreen
+import rs.etf.focusguard.ui.elements.screens.JoinSessionDialog
 import rs.etf.focusguard.ui.elements.screens.NewSessionScreen
 import rs.etf.focusguard.ui.elements.screens.PreviousSessionsScreen
 import rs.etf.focusguard.ui.elements.screens.ScheduledSessionsScreen
@@ -57,6 +58,7 @@ fun FocusGuardApp(
     val scheduledMessage = stringResource(R.string.schedule_confirmation)
 
     val runningSession by viewModel.runningSession.collectAsStateWithLifecycle()
+    val dueSession by viewModel.dueSession.collectAsStateWithLifecycle()
     val currentEntry by navController.currentBackStackEntryAsState()
 
     // Reopening the app mid-session should land on the timer, not on Home.
@@ -125,5 +127,14 @@ fun FocusGuardApp(
                 contentColor = Accent,
             ) { Text(text = data.visuals.message) }
         }
+    }
+
+    // Only offered when nothing is already running, so a due session cannot interrupt one.
+    dueSession?.takeIf { runningSession == null }?.let { session ->
+        JoinSessionDialog(
+            session = session,
+            onJoin = { viewModel.joinSession(session) },
+            onDismiss = { viewModel.dismissDueSession(session.id) },
+        )
     }
 }

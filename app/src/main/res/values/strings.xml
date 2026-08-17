@@ -29,6 +29,8 @@
     <string name="action_cancel">Cancel</string>
     <string name="action_close">Close</string>
     <string name="action_ok">OK</string>
+    <string name="action_type_time">Type the time</string>
+    <string name="action_pick_time_on_dial">Pick the time on a dial</string>
     <string name="back">Back</string>
 
     <!-- Scheduling -->
@@ -109,4 +111,25 @@
     <string name="warning_movement_big">Stop Using\nThe Phone!</string>
     <string name="warning_tap_dismiss">Tap anywhere to dismiss</string>
     <string name="action_dismiss">Dismiss</string>
+
+    <!-- Scheduled session reminders -->
+    <string name="reminder_channel_name">Session reminders</string>
+    <string name="reminder_channel_description">Reminds you before a scheduled focus session starts.</string>
+    <string name="reminder_title">Focus Guard</string>
+    <string name="reminder_one_hour">\"%1$s\" starts in 1 hour.</string>
+    <string name="reminder_five_minutes">\"%1$s\" starts in 5 minutes.</string>
+    <string name="reminder_starting_now">\"%1$s\" is starting now.</string>
+
+    <!-- Join dialog -->
+    <string name="join_dialog_title">Session Starting!</string>
+    <plurals name="join_dialog_starts_in">
+        <item quantity="one">\"%1$s\" starts in %2$d minute.</item>
+        <item quantity="other">\"%1$s\" starts in %2$d minutes.</item>
+    </plurals>
+    <string name="join_dialog_starting_now">\"%1$s\" is starting now.</string>
+    <plurals name="join_dialog_started_ago">
+        <item quantity="one">\"%1$s\" was due %2$d minute ago. Start it now?</item>
+        <item quantity="other">\"%1$s\" was due %2$d minutes ago. Start it now?</item>
+    </plurals>
+    <string name="action_join_session">Join Session</string>
 </resources>

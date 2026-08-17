@@ -8,6 +8,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.parcelize.Parcelize
 import kotlinx.coroutines.launch
 import rs.etf.focusguard.data.SessionRepository
+import rs.etf.focusguard.alarms.SessionAlarmScheduler
 import rs.etf.focusguard.data.room.Session
 import rs.etf.focusguard.data.room.SessionStatus
 import rs.etf.focusguard.util.atTimeToInstant
@@ -54,6 +55,7 @@ data class NewSessionUiState(
 class NewSessionViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
     private val sessionRepository: SessionRepository,
+    private val alarmScheduler: SessionAlarmScheduler,
 ) : ViewModel() {
 
     companion object {
@@ -151,16 +153,19 @@ class NewSessionViewModel @Inject constructor(
                 return@launch
             }
 
-            sessionRepository.insertSession(
-                Session(
-                    name = name,
-                    goalMinutes = state.goalMinutesOrDefault,
-                    plannedPauseCount = state.pauseCountOrZero,
-                    plannedPauseMinutes = state.pauseMinutesOrZero,
-                    status = SessionStatus.SCHEDULED,
-                    scheduledAt = start,
-                )
+            val scheduled = Session(
+                name = name,
+                goalMinutes = state.goalMinutesOrDefault,
+                plannedPauseCount = state.pauseCountOrZero,
+                plannedPauseMinutes = state.pauseMinutesOrZero,
+                status = SessionStatus.SCHEDULED,
+                scheduledAt = start,
             )
+            val id = sessionRepository.insertSession(scheduled)
+
+            // Alarms are booked against the stored id, so this must follow the insert.
+            alarmScheduler.schedule(scheduled.copy(id = id))
+
             update { it.copy(isScheduleDialogOpen = false, scheduleError = null, conflictName = null) }
             onScheduled(name)
         }
