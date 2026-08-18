@@ -30,6 +30,7 @@ import rs.etf.focusguard.ui.elements.theme.Green
 import rs.etf.focusguard.ui.elements.theme.TextPrimary
 import rs.etf.focusguard.ui.elements.theme.TextSecondary
 import rs.etf.focusguard.ui.elements.theme.Yellow
+import rs.etf.focusguard.util.formatDuration
 import rs.etf.focusguard.util.formatMinutesSeconds
 import rs.etf.focusguard.util.scoreColor
 
@@ -101,7 +102,7 @@ private fun PauseLogItem(index: Int, pause: Pause, modifier: Modifier = Modifier
             }
             LabelledValue(
                 label = stringResource(R.string.pause_log_duration),
-                value = stringResource(R.string.value_minutes, pause.durationSeconds / 60),
+                value = formatDuration(pause.durationSeconds),
             )
             LabelledValue(
                 label = stringResource(R.string.pause_log_time),

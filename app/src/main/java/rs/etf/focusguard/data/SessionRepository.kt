@@ -39,6 +39,9 @@ class SessionRepository @Inject constructor(
 
     suspend fun getRunningSession(): Session? = sessionDao.getRunning()
 
+    /** Finished sessions still waiting for a score. See [SessionDao.getUnrated]. */
+    suspend fun getUnratedSessions(): List<Session> = sessionDao.getUnrated()
+
     suspend fun insertSession(session: Session): Long = sessionDao.insert(session)
 
     suspend fun updateSession(session: Session) = sessionDao.update(session)

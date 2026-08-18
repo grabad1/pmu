@@ -1,6 +1,9 @@
 package rs.etf.focusguard.util
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import rs.etf.focusguard.R
 import rs.etf.focusguard.ui.elements.theme.Blue
 import rs.etf.focusguard.ui.elements.theme.Green
 import rs.etf.focusguard.ui.elements.theme.Red
@@ -36,6 +39,27 @@ fun formatHoursMinutesSeconds(totalSeconds: Int): String {
 fun formatMinutesSeconds(totalSeconds: Int): String {
     val safe = totalSeconds.coerceAtLeast(0)
     return "%02d:%02d".format(safe / 60, safe % 60)
+}
+
+/**
+ * A duration in words, never rounded down to nothing.
+ *
+ * Whole minutes are fine for a goal the user typed, but not for a measured duration: a
+ * 16-second pause displayed as "0 min" reads as though it was not recorded, and a 39-second
+ * session as though no work happened. Seconds are shown below a minute, and alongside minutes
+ * up to an hour, after which they stop being interesting.
+ */
+@Composable
+fun formatDuration(totalSeconds: Int): String {
+    val safe = totalSeconds.coerceAtLeast(0)
+    val minutes = safe / 60
+    val seconds = safe % 60
+
+    return when {
+        minutes == 0 -> stringResource(R.string.value_seconds, seconds)
+        seconds == 0 || minutes >= 60 -> stringResource(R.string.value_minutes, minutes)
+        else -> stringResource(R.string.value_minutes_seconds, minutes, seconds)
+    }
 }
 
 /** Green at or above 70, yellow from 40, red below — matching the prototype. */

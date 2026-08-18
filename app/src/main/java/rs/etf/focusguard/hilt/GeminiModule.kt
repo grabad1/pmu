@@ -37,10 +37,12 @@ object GeminiModule {
 
         return OkHttpClient.Builder()
             .addInterceptor(logging)
-            // A rating is not worth making the user wait, and the local fallback covers a
-            // timeout, so these are deliberately short.
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(20, TimeUnit.SECONDS)
+            // Generous, because nothing is waiting on it. The rating runs after the session is
+            // stored and the timer screen released, so the user never sees this delay — but
+            // when it expired the score silently became the local one instead. Measured
+            // replies took 16-26 seconds, so the old 20 lost roughly a third of them.
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
             .build()
     }
 

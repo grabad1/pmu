@@ -71,4 +71,20 @@ interface SessionDao {
     @Transaction
     @Query("SELECT * FROM sessions WHERE status = 'COMPLETED' ORDER BY endedAt DESC")
     fun getCompletedWithPausesAsFlow(): Flow<List<SessionWithPauses>>
+
+    /**
+     * Finished sessions that never got a score.
+     *
+     * Rating happens in a coroutine after the session is stored, so a process death inside
+     * that window leaves the row finished but unrated, and nothing would otherwise go back
+     * for it. Oldest first, so the longest-waiting session is rescued first.
+     */
+    @Query(
+        """
+        SELECT * FROM sessions
+        WHERE status = 'COMPLETED' AND focusScore IS NULL
+        ORDER BY endedAt ASC
+        """
+    )
+    suspend fun getUnrated(): List<Session>
 }

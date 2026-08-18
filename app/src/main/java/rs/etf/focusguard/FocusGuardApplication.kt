@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import rs.etf.focusguard.data.SessionEngine
 import rs.etf.focusguard.data.SessionRepository
 import javax.inject.Inject
 
@@ -18,11 +19,15 @@ class FocusGuardApplication : Application() {
     @Inject
     lateinit var sessionRepository: SessionRepository
 
+    @Inject
+    lateinit var sessionEngine: SessionEngine
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
         super.onCreate()
         resumeInterruptedSession()
+        rateSessionsLeftUnscored()
     }
 
     /**
@@ -36,5 +41,14 @@ class FocusGuardApplication : Application() {
             Log.d(LOG_TAG, "Resuming interrupted session ${running.id}")
             FocusSessionService.start(this@FocusGuardApplication, running.id)
         }
+    }
+
+    /**
+     * The same process death can also strand a session that *did* end: rating happens after
+     * the session is stored, so a few seconds of bad luck used to leave it unscored for ever.
+     * Starting the app is the natural moment to go back for those.
+     */
+    private fun rateSessionsLeftUnscored() {
+        scope.launch { sessionEngine.rateOutstandingSessions() }
     }
 }

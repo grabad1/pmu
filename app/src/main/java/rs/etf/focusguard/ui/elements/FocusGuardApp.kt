@@ -1,5 +1,10 @@
 package rs.etf.focusguard.ui.elements
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -80,6 +85,25 @@ fun FocusGuardApp(
         NavHost(
             navController = navController,
             startDestination = Home,
+            // The prototype swaps screens instantly, which on a real device reads as a glitch.
+            // A short slide with a fade gives the back stack a direction: forward moves left,
+            // back moves right. Deliberately quick — this is a timer, not a gallery.
+            enterTransition = {
+                slideInHorizontally(animationSpec = tween(TRANSITION_MILLIS)) { it / 6 } +
+                    fadeIn(animationSpec = tween(TRANSITION_MILLIS))
+            },
+            exitTransition = {
+                slideOutHorizontally(animationSpec = tween(TRANSITION_MILLIS)) { -it / 8 } +
+                    fadeOut(animationSpec = tween(TRANSITION_MILLIS))
+            },
+            popEnterTransition = {
+                slideInHorizontally(animationSpec = tween(TRANSITION_MILLIS)) { -it / 8 } +
+                    fadeIn(animationSpec = tween(TRANSITION_MILLIS))
+            },
+            popExitTransition = {
+                slideOutHorizontally(animationSpec = tween(TRANSITION_MILLIS)) { it / 6 } +
+                    fadeOut(animationSpec = tween(TRANSITION_MILLIS))
+            },
         ) {
             composable<Home> {
                 HomeScreen(
@@ -147,3 +171,6 @@ fun FocusGuardApp(
         )
     }
 }
+
+/** Short enough to feel like a response rather than a wait. */
+private const val TRANSITION_MILLIS = 260

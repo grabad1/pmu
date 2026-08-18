@@ -39,6 +39,13 @@
     <string name="schedule_conflict">Conflicts with \"%1$s\".</string>
     <string name="schedule_confirmation">\"%1$s\" scheduled!</string>
     <string name="scheduled_empty">No sessions scheduled yet.</string>
+    <string name="scheduled_card_footer">Tap to view or cancel ↗</string>
+    <string name="scheduled_missed">Missed</string>
+    <string name="scheduled_missed_footer">Was due %1$s · tap to remove ↗</string>
+    <string name="scheduled_dialog_body">Reminders are set for one hour before, five minutes before, and at the start.</string>
+    <string name="scheduled_dialog_missed_body">This session was never started, so its reminders have already passed. Removing it clears it from the list.</string>
+    <string name="action_cancel_session">Cancel Session</string>
+    <string name="action_remove">Remove</string>
 
     <!-- Card details -->
     <string name="detail_goal_time">Goal Time</string>
@@ -49,6 +56,14 @@
     <string name="value_minutes">%1$d min</string>
     <string name="value_minutes_over">%1$d min  🔵</string>
     <string name="value_minutes_each">%1$d min each</string>
+    <!--
+      Durations that can be short are rendered from these rather than from value_minutes.
+      Integer minutes turn a 16 second pause into "0 min", which reads as though nothing was
+      recorded at all — the same trap the AI prompt already avoids by reporting seconds.
+    -->
+    <string name="value_seconds">%1$d s</string>
+    <string name="value_minutes_seconds">%1$d min %2$d s</string>
+    <string name="value_duration_over">%1$s  🔵</string>
     <plurals name="value_pauses">
         <item quantity="one">%1$d pause</item>
         <item quantity="other">%1$d pauses</item>

@@ -37,6 +37,7 @@ import rs.etf.focusguard.ui.elements.theme.TextTertiary
 import rs.etf.focusguard.ui.stateholders.PreviousSessionsViewModel
 import rs.etf.focusguard.util.actualTimeColor
 import rs.etf.focusguard.util.formatDate
+import rs.etf.focusguard.util.formatDuration
 import rs.etf.focusguard.util.formatTime
 import rs.etf.focusguard.util.scoreColor
 
@@ -88,9 +89,9 @@ private fun PreviousSessionCard(
     modifier: Modifier = Modifier,
 ) {
     val session = item.session
-    val actualMinutes = session.focusedSeconds / 60
     val goalSeconds = session.goalMinutes * 60
     val isOvertime = session.focusedSeconds > goalSeconds
+    val actualTime = formatDuration(session.focusedSeconds)
 
     FocusCard(modifier = modifier, onClick = onCardClick) {
         Row(
@@ -134,9 +135,9 @@ private fun PreviousSessionCard(
                     DetailItem(
                         label = stringResource(R.string.detail_actual_time),
                         value = if (isOvertime) {
-                            stringResource(R.string.value_minutes_over, actualMinutes)
+                            stringResource(R.string.value_duration_over, actualTime)
                         } else {
-                            stringResource(R.string.value_minutes, actualMinutes)
+                            actualTime
                         },
                         valueColor = actualTimeColor(session.focusedSeconds, goalSeconds),
                     )

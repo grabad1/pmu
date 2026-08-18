@@ -189,6 +189,29 @@ class SessionEngine @Inject constructor(
         _ratedSessions.tryEmit(sessionId)
     }
 
+    /**
+     * Scores any finished session that never got a score, and is called once when the app
+     * starts.
+     *
+     * [endSession] launches the rating and returns immediately, so that leaving the timer is
+     * never held up by the network. The cost of that is a window of up to half a minute in
+     * which the process can die — the user swipes the app away, or Android reclaims it — and
+     * take the in-flight rating with it. Testing found three sessions stranded that way, and
+     * without this nothing ever went back for them: they stayed unscored for good.
+     *
+     * Rating is idempotent, since only rows with a null score are considered.
+     */
+    suspend fun rateOutstandingSessions() {
+        val unrated = repository.getUnratedSessions()
+        if (unrated.isEmpty()) return
+
+        Log.d(LOG_TAG, "Found ${unrated.size} finished session(s) with no score; rating them")
+        unrated.forEach { session ->
+            runCatching { rate(session.id) }
+                .onFailure { Log.w(LOG_TAG, "Could not rate session ${session.id}: ${it.message}") }
+        }
+    }
+
     private fun startTicking() {
         ticker?.cancel()
         ticker = scope.launch {
