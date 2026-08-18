@@ -25,6 +25,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import rs.etf.focusguard.FocusGuardActivity
+import rs.etf.focusguard.FocusSessionService
 import rs.etf.focusguard.LOG_TAG
 import rs.etf.focusguard.R
 import rs.etf.focusguard.data.SessionEngine
@@ -126,6 +127,22 @@ class AwayFromAppMonitor @Inject constructor(
                 )
             )
             .setContentIntent(openApp)
+            // The same two controls the session notification offers, because the honest
+            // answer to "you have been away four minutes" is sometimes "yes, I know — take a
+            // break" or "yes, I am done". Making them come back just to say so is a nag.
+            //
+            // Pausing stops time away accruing, so this notification clears itself a moment
+            // later; ending stops the service, which does the same.
+            .addAction(
+                0,
+                context.getString(R.string.action_pause),
+                serviceAction(FocusSessionService.ACTION_TOGGLE_PAUSE, PAUSE_REQUEST_CODE),
+            )
+            .addAction(
+                0,
+                context.getString(R.string.action_end_session),
+                serviceAction(FocusSessionService.ACTION_END, END_REQUEST_CODE),
+            )
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             // Deliberately not dismissible by a swipe: the point is that it stays in front of
@@ -136,6 +153,14 @@ class AwayFromAppMonitor @Inject constructor(
 
         NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
     }
+
+    private fun serviceAction(action: String, requestCode: Int): PendingIntent =
+        PendingIntent.getService(
+            context,
+            requestCode,
+            Intent(context, FocusSessionService::class.java).setAction(action),
+            PendingIntent.FLAG_IMMUTABLE,
+        )
 
     private fun clearNotification() {
         NotificationManagerCompat.from(context).cancel(NOTIFICATION_ID)
@@ -172,7 +197,12 @@ class AwayFromAppMonitor @Inject constructor(
     private companion object {
         const val CHANNEL_ID = "focus_guard_away"
         const val NOTIFICATION_ID = 2
+
+        // Distinct from the session notification's own codes, so the two sets of buttons
+        // cannot collapse into one another.
         const val REQUEST_CODE = 3
+        const val PAUSE_REQUEST_CODE = 4
+        const val END_REQUEST_CODE = 5
 
         const val CHECK_EVERY_MILLIS = 1_000L
 
