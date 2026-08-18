@@ -77,6 +77,38 @@ class ConditionTrackerTest {
     }
 
     @Test
+    fun `a pause restarts the sustain window but keeps the cooldown`() {
+        // How EnvironmentMonitor treats a break: it feeds every tracker `violating = false`
+        // for as long as the session is paused, so the condition has to hold for another full
+        // window of focus before it warns again.
+        val tracker = tracker(sustain = 10, cooldown = 60)
+
+        assertFalse(tracker.update(violating = true, nowSeconds = 0))
+        assertTrue(tracker.update(violating = true, nowSeconds = 10))
+
+        // Three minutes of pause. Long enough that the cooldown lapses on its own.
+        for (second in 11L..190L) {
+            assertFalse(tracker.update(violating = false, nowSeconds = second))
+        }
+
+        // Focus resumes into the same bad conditions: no instant warning, ten more seconds.
+        assertFalse(tracker.update(violating = true, nowSeconds = 191))
+        assertFalse(tracker.update(violating = true, nowSeconds = 200))
+        assertTrue(tracker.update(violating = true, nowSeconds = 201))
+    }
+
+    @Test
+    fun `a warning just before a pause is not repeated just after a short one`() {
+        val tracker = tracker(sustain = 0, cooldown = 120)
+
+        assertTrue(tracker.update(violating = true, nowSeconds = 0))
+
+        // A thirty-second break, then movement again — still inside the cooldown.
+        for (second in 1L..30L) tracker.update(violating = false, nowSeconds = second)
+        assertFalse(tracker.update(violating = true, nowSeconds = 31))
+    }
+
+    @Test
     fun `a zero sustain window warns on the first violating reading`() {
         // Movement is configured this way: handling a phone is a burst, not a state.
         val tracker = tracker(sustain = 0, cooldown = 60)

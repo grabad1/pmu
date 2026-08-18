@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,16 +35,33 @@ class ActiveSessionViewModel @Inject constructor(
     val showBigWarning = _showBigWarning.asStateFlow()
 
     private var nextToastId = 0L
+    private var bigWarningJob: Job? = null
 
     init {
         viewModelScope.launch {
             environmentMonitor.warnings.collect { kind ->
                 if (kind == WarningKind.MOVEMENT) {
-                    _showBigWarning.value = true
+                    showBigWarning()
                 } else {
                     showToast(kind)
                 }
             }
+        }
+    }
+
+    /**
+     * The overlay covers the whole screen and swallows the tap that dismisses it, which is
+     * right — a tap meant to clear a warning must not also press End Session underneath.
+     * That makes it a trap if it never goes away on its own: during testing it sat there for
+     * three minutes and turned the next two taps into the wrong actions entirely. So it now
+     * clears itself, and a fresh warning restarts the clock rather than stacking.
+     */
+    private fun showBigWarning() {
+        _showBigWarning.value = true
+        bigWarningJob?.cancel()
+        bigWarningJob = viewModelScope.launch {
+            delay(BIG_WARNING_VISIBLE_MILLIS)
+            _showBigWarning.value = false
         }
     }
 
@@ -62,6 +80,8 @@ class ActiveSessionViewModel @Inject constructor(
     }
 
     fun dismissBigWarning() {
+        bigWarningJob?.cancel()
+        bigWarningJob = null
         _showBigWarning.value = false
     }
 
@@ -78,5 +98,11 @@ class ActiveSessionViewModel @Inject constructor(
 
     private companion object {
         const val TOAST_VISIBLE_MILLIS = 4_500L
+
+        /**
+         * Long enough to be unmissable and to interrupt the reach for the phone, short enough
+         * that an unattended phone is not left behind a wall.
+         */
+        const val BIG_WARNING_VISIBLE_MILLIS = 12_000L
     }
 }

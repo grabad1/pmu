@@ -118,20 +118,36 @@ class EnvironmentMonitor @Inject constructor(
             while (isActive) {
                 delay(EVALUATE_EVERY_MILLIS)
                 ticks++
-                evaluateConditions()
-                if (ticks % (EnvironmentThresholds.SAMPLE_EVERY_SECONDS) == 0L) {
+                val focusing = evaluateConditions()
+                if (focusing && ticks % (EnvironmentThresholds.SAMPLE_EVERY_SECONDS) == 0L) {
                     persistLatest()
                 }
             }
         }
     }
 
-    private fun evaluateConditions() {
-        // Pauses are legitimate phone time, so nothing is judged while paused.
-        val state = sessionEngine.state.value
-        if (state == null || state.isPaused) return
-
+    /**
+     * @return true when the session is actually focusing, so this tick's readings count.
+     */
+    private fun evaluateConditions(): Boolean {
         val nowSeconds = System.nanoTime() / 1_000_000_000L
+
+        // Pauses are legitimate phone time, so nothing is judged while paused — and readings
+        // taken during one are discarded rather than merely skipped. A peak kept across a
+        // pause is judged the instant focus resumes: that is how a movement warning once
+        // fired 174 ms after a three-minute break, from a phone that had been put down
+        // before the break even started.
+        val state = sessionEngine.state.value
+        if (state == null || state.isPaused) {
+            peakSinceEvaluation.clear()
+            peakSinceSample.clear()
+            // Telling every tracker the condition is clear restarts its sustain window, so a
+            // dark room must be dark for another full window of *focus* before it warns.
+            // Cooldowns deliberately survive: a warning given just before a break is still
+            // recent when the break ends.
+            trackers.values.forEach { it.update(violating = false, nowSeconds = nowSeconds) }
+            return false
+        }
 
         // "Too dark" is a floor, so the newest reading is what matters; a peak would hide it.
         latest[SensorKind.LIGHT]?.let { lux ->
@@ -155,6 +171,8 @@ class EnvironmentMonitor @Inject constructor(
             val reported = if (turned && !moved) rotationPeak ?: 0f else motionPeak ?: 0f
             raiseIf(WarningKind.MOVEMENT, moved || turned, nowSeconds, reported)
         }
+
+        return true
     }
 
     private fun raiseIf(kind: WarningKind, violating: Boolean, nowSeconds: Long, value: Float) {
@@ -164,6 +182,11 @@ class EnvironmentMonitor @Inject constructor(
         _warnings.tryEmit(kind)
     }
 
+    /**
+     * Writes one sample per sensor. Only ever called while focusing, so stored history covers
+     * focus time alone — the rating divides by the number of samples, and counting a break
+     * during which the phone was legitimately picked up would score the user down for it.
+     */
     private suspend fun persistLatest() {
         val sessionId = sessionEngine.state.value?.sessionId ?: return
         if (latest.isEmpty()) return

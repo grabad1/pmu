@@ -1,7 +1,10 @@
 package rs.etf.focusguard.sensors
 
 import android.Manifest
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
@@ -9,6 +12,7 @@ import android.media.MediaRecorder
 import android.util.Log
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
+import rs.etf.focusguard.BuildConfig
 import rs.etf.focusguard.LOG_TAG
 import javax.inject.Inject
 import kotlin.math.log10
@@ -47,12 +51,16 @@ class MicrophoneNoiseSource @Inject constructor(
     private var recorder: AudioRecord? = null
     private var bufferSize: Int = 0
     private var buffer: ShortArray = ShortArray(0)
+    private var injection: NoiseInjection? = null
 
     override fun isAvailable(): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
 
     override fun start() {
+        if (BuildConfig.DEBUG) {
+            injection = NoiseInjection(context).also(NoiseInjection::register)
+        }
         if (!isAvailable()) {
             Log.w(LOG_TAG, "Microphone permission not granted; noise monitoring disabled")
             return
@@ -87,6 +95,8 @@ class MicrophoneNoiseSource @Inject constructor(
     }
 
     override fun readLevelDb(): Float? {
+        injection?.levelDb?.let { return it }
+
         val active = recorder ?: return null
         val read = active.read(buffer, 0, bufferSize)
         if (read <= 0) return null
@@ -105,6 +115,8 @@ class MicrophoneNoiseSource @Inject constructor(
     }
 
     override fun stop() {
+        injection?.unregister()
+        injection = null
         recorder?.let {
             runCatching { it.stop() }
             it.release()
@@ -118,5 +130,54 @@ class MicrophoneNoiseSource @Inject constructor(
         const val SAMPLE_RATE = 16_000
         const val CHANNEL = AudioFormat.CHANNEL_IN_MONO
         const val ENCODING = AudioFormat.ENCODING_PCM_16BIT
+    }
+}
+
+/**
+ * Debug-only hook that lets a loudness reading be supplied from the command line.
+ *
+ * Every other sensor can be driven on the emulator with `adb emu sensor set`, but there is no
+ * equivalent for audio: the emulator's microphone returns digital silence, so the whole chain
+ * from reading to warning to stored sample has never once run for noise. This closes that gap
+ * without weakening the threshold to the point of meaninglessness.
+ *
+ * ```
+ * adb shell am broadcast -a rs.etf.focusguard.DEBUG_NOISE --ef db 75   # loud room
+ * adb shell am broadcast -a rs.etf.focusguard.DEBUG_NOISE --ef db -1   # back to the mic
+ * ```
+ *
+ * Registered only when [BuildConfig.DEBUG] is true, so it does not exist in a release build.
+ */
+private class NoiseInjection(private val context: Context) : BroadcastReceiver() {
+
+    /** Level to report instead of the microphone, or null to use the microphone. */
+    @Volatile
+    var levelDb: Float? = null
+        private set
+
+    fun register() {
+        // Exported so `adb shell am broadcast` — a different uid — can reach it.
+        ContextCompat.registerReceiver(
+            context,
+            this,
+            IntentFilter(ACTION),
+            ContextCompat.RECEIVER_EXPORTED,
+        )
+    }
+
+    fun unregister() {
+        runCatching { context.unregisterReceiver(this) }
+        levelDb = null
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        // Negative means "stop pretending", since the scale itself never goes below zero.
+        levelDb = intent.getFloatExtra(EXTRA_DB, -1f).takeIf { it >= 0f }
+        Log.d(LOG_TAG, "Debug noise injection: ${levelDb ?: "off"}")
+    }
+
+    private companion object {
+        const val ACTION = "rs.etf.focusguard.DEBUG_NOISE"
+        const val EXTRA_DB = "db"
     }
 }

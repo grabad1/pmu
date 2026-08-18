@@ -32,10 +32,17 @@ object EnvironmentThresholds {
     const val DARK_SUSTAIN_SECONDS = 10L
 
     /**
-     * Relative loudness, not calibrated SPL — the microphone reports amplitude, which is only
-     * meaningful against itself. Roughly "clearly louder than a quiet room".
+     * Relative loudness, not calibrated SPL. [rs.etf.focusguard.sensors.MicrophoneNoiseSource]
+     * reports `20·log10(rms)` of 16-bit samples, so the scale runs from 0 for silence to about
+     * 90 at full scale, and sits roughly 30 below the dB SPL a sound-level meter would show.
+     *
+     * 70 was set by eye and was far too high: it needs a tenth of full-scale amplitude held
+     * for fifteen seconds, which is shouting into the microphone. 50 is about a tenth of that
+     * pressure — a conversation beside the desk. Still a guess until it is checked against a
+     * real device, since the emulator's microphone reports digital silence and cannot settle
+     * it; inject a level with `DEBUG_NOISE` to exercise the path meanwhile.
      */
-    const val LOUD_DB = 70f
+    const val LOUD_DB = 50f
     const val LOUD_SUSTAIN_SECONDS = 15L
 
     /**
