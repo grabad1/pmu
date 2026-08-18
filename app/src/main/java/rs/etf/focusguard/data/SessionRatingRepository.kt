@@ -103,6 +103,11 @@ class SessionRatingRepository @Inject constructor(
         appendLine("- Phone was being moved or handled during ${summary.movementFraction.asPercent()} of readings")
         appendLine("- Room was noisy during ${summary.loudFraction.asPercent()} of readings")
         appendLine("- Light was poor during ${summary.darkFraction.asPercent()} of readings")
+        appendLine(
+            "- Time spent in a different app while the timer was running: " +
+                "${summary.awayDescription}, which is " +
+                "${(summary.awayShare * 100).roundToInt()}% of the focus time claimed"
+        )
         appendLine()
         appendLine("How to score it, in order of importance:")
         appendLine(
@@ -137,6 +142,12 @@ class SessionRatingRepository @Inject constructor(
                 "break per 20 minutes is sensible, so ${summary.goalMinutes} minutes warrants " +
                 "about ${summary.reasonablePauseCount}. A 45-minute session with 5 planned " +
                 "breaks is chopped up and should score lower than one with none."
+        )
+        appendLine(
+            "7. Time spent in another app while the timer ran is the most damaging of all, " +
+                "because unlike a break the session went on counting it as focus. Ignore " +
+                "under about half a minute — glancing at a message is ordinary — but beyond " +
+                "that reduce the score in proportion, and say so directly."
         )
         appendLine()
         appendLine(

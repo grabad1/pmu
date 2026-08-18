@@ -30,6 +30,12 @@ data class SessionRuntimeState(
     val hasPlannedPauses: Boolean = false,
 
     val plannedPausesRemaining: Int = 0,
+
+    /** Seconds spent in another app while this session was supposed to be focusing. */
+    val awaySeconds: Int = 0,
+
+    /** True while the user is in another app during focus time. */
+    val isAway: Boolean = false,
 ) {
     val isPaused: Boolean get() = activePauseType != null
 

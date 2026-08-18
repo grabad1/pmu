@@ -6,6 +6,12 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!--
+      A warning the user cannot see is no warning at all. Once they leave the app the
+      full-screen overlay is behind whatever they opened, so the nudge has to be a buzz and a
+      heads-up notification instead. VIBRATE is granted at install; nothing to ask for.
+    -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!--
       Reminders are only useful if they are punctual, so exact alarms are required.

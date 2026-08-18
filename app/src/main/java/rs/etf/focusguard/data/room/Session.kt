@@ -39,6 +39,15 @@ data class Session(
     /** Accumulated focus time, excluding all pauses. */
     val focusedSeconds: Int = 0,
 
+    /**
+     * Seconds spent in another app while the session was focusing.
+     *
+     * Time during a break is not counted: a break is time the user is entitled to spend
+     * wherever they like. This is the one distraction no sensor can see, so it is measured
+     * directly and fed to the rating.
+     */
+    val awaySeconds: Int = 0,
+
     /** AI rating, 0..100. Null until the session has been analysed. */
     val focusScore: Int? = null,
 

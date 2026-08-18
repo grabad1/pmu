@@ -21,6 +21,8 @@ data class SessionSummary(
     val plannedPausesTaken: Int,
     val unplannedPauseCount: Int,
     val unplannedPauseSeconds: Int,
+    /** Seconds spent in another app while the session was supposed to be focusing. */
+    val awaySeconds: Int,
     /** 0..1 fractions of stored samples that breached each threshold. */
     val darkFraction: Double,
     val loudFraction: Double,
@@ -33,12 +35,7 @@ data class SessionSummary(
      * Human wording that never rounds a real session down to nothing — "0 minutes" for a
      * 52-second session led the model to conclude no focus had happened at all.
      */
-    val focusedDescription: String
-        get() = when {
-            focusedSeconds < 60 -> "$focusedSeconds seconds"
-            focusedSeconds % 60 == 0 -> "${focusedSeconds / 60} minutes"
-            else -> "${focusedSeconds / 60} minutes ${focusedSeconds % 60} seconds"
-        }
+    val focusedDescription: String get() = describeSeconds(focusedSeconds)
 
     private val goalSeconds: Int get() = goalMinutes * 60
 
@@ -52,6 +49,18 @@ data class SessionSummary(
         get() = if (goalSeconds <= 0) 1.0 else focusedSeconds.toDouble() / goalSeconds
 
     val unplannedPauseMinutes: Int get() = unplannedPauseSeconds / 60
+
+    /**
+     * How much of the focus time was actually spent in another app, 0..1.
+     *
+     * Measured against focus time rather than desk time, because that is what it displaced:
+     * the timer kept running while the user was on Instagram, so the session claims focus
+     * that did not happen.
+     */
+    val awayShare: Double
+        get() = if (focusedSeconds <= 0) 0.0 else awaySeconds.toDouble() / focusedSeconds
+
+    val awayDescription: String get() = describeSeconds(awaySeconds)
 
     /** How much of the time at the desk was lost to unplanned breaks, 0..1. */
     val unplannedShare: Double
@@ -71,6 +80,25 @@ data class SessionSummary(
 
     companion object {
 
+        /**
+         * "45 seconds", "1 minute", "3 minutes 12 seconds" — always in words the model and the
+         * user can read, never rounded down to nothing, and never "1 minutes".
+         */
+        private fun describeSeconds(totalSeconds: Int): String {
+            val safe = totalSeconds.coerceAtLeast(0)
+            val minutes = safe / 60
+            val seconds = safe % 60
+
+            fun plural(value: Int, unit: String) =
+                "$value $unit" + if (value == 1) "" else "s"
+
+            return when {
+                minutes == 0 -> plural(seconds, "second")
+                seconds == 0 -> plural(minutes, "minute")
+                else -> "${plural(minutes, "minute")} ${plural(seconds, "second")}"
+            }
+        }
+
         fun from(item: SessionWithPauses, samples: List<SensorSample>): SessionSummary {
             val session: Session = item.session
             val unplanned = item.unplannedPauses
@@ -83,6 +111,7 @@ data class SessionSummary(
                 plannedPausesTaken = item.pauses.count { it.type == PauseType.PLANNED },
                 unplannedPauseCount = unplanned.size,
                 unplannedPauseSeconds = unplanned.sumOf { it.durationSeconds },
+                awaySeconds = session.awaySeconds,
                 darkFraction = samples.fractionOf(SensorKind.LIGHT) {
                     it < EnvironmentThresholds.DARK_LUX
                 },

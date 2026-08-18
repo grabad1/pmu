@@ -79,6 +79,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.service)
+    // ProcessLifecycleOwner: tells the app when it is no longer the screen the user is on.
+    implementation(libs.androidx.lifecycle.process)
 
     // https://developer.android.com/jetpack/compose/navigation
     implementation(libs.androidx.navigation.compose)

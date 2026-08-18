@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -154,6 +155,15 @@ private fun PreviousSessionCard(
                 valueColor = Accent,
                 modifier = Modifier.clickable(onClick = onPausesClick),
             )
+
+            // Only shown when it happened: a clean session should not carry a row of zeroes.
+            if (session.awaySeconds > 0) {
+                DetailItem(
+                    label = stringResource(R.string.detail_time_away),
+                    value = formatDuration(session.awaySeconds),
+                    valueColor = MaterialTheme.colorScheme.error,
+                )
+            }
         }
 
         HorizontalDivider(

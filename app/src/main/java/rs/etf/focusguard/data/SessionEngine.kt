@@ -19,6 +19,7 @@ import rs.etf.focusguard.data.room.Pause
 import rs.etf.focusguard.data.room.PauseType
 import rs.etf.focusguard.data.room.Session
 import rs.etf.focusguard.data.room.SessionStatus
+import rs.etf.focusguard.util.AppForegroundMonitor
 import rs.etf.focusguard.util.plannedPauseOffsetsSeconds
 import java.time.Duration
 import java.time.Instant
@@ -40,6 +41,7 @@ import javax.inject.Singleton
 class SessionEngine @Inject constructor(
     private val repository: SessionRepository,
     private val ratingRepository: SessionRatingRepository,
+    private val appForegroundMonitor: AppForegroundMonitor,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val mutex = Mutex()
@@ -70,6 +72,48 @@ class SessionEngine @Inject constructor(
     private var pauseType: PauseType? = null
     private var openPauseId: Long? = null
     private var plannedPausesTaken: Int = 0
+
+    /**
+     * Seconds spent in another app while the session was supposed to be focusing.
+     *
+     * Counted the same way as focus time — from timestamps, not by counting ticks — and only
+     * while actually focusing: leaving the phone during a planned break is the point of the
+     * break, not a lapse.
+     */
+    private var awayBanked: Int = 0
+    private var awaySegmentStart: Instant? = null
+
+    init {
+        // Leaving the app during a session is the one distraction the sensors cannot see, so
+        // the engine watches for it directly.
+        scope.launch {
+            appForegroundMonitor.isForeground.collect { foreground ->
+                mutex.withLock {
+                    if (foreground) endAwaySegment() else startAwaySegment()
+                }
+                recompute()
+            }
+        }
+    }
+
+    /** Must be called with [mutex] held. */
+    private fun startAwaySegment() {
+        if (session == null || pauseType != null) return
+        if (awaySegmentStart == null) awaySegmentStart = Instant.now()
+    }
+
+    /** Must be called with [mutex] held. */
+    private fun endAwaySegment() {
+        val start = awaySegmentStart ?: return
+        awayBanked += Duration.between(start, Instant.now()).seconds.toInt().coerceAtLeast(0)
+        awaySegmentStart = null
+    }
+
+    /** Must be called with [mutex] held. */
+    private fun computeAwaySeconds(): Int {
+        val start = awaySegmentStart ?: return awayBanked
+        return awayBanked + Duration.between(start, Instant.now()).seconds.toInt().coerceAtLeast(0)
+    }
 
     /**
      * Begins or resumes timing [sessionId]. Idempotent: attaching to the session already
@@ -131,6 +175,14 @@ class SessionEngine @Inject constructor(
                 "SessionEngine.attach($sessionId) focus=$bankedFocusSeconds " +
                     "offsets=$plannedOffsets paused=${pauseType != null}",
             )
+
+            // Time away carries over from what was already stored, so a session recovered
+            // after process death does not forget that the user had wandered off.
+            awayBanked = loaded.awaySeconds
+            awaySegmentStart = null
+            if (pauseType == null && !appForegroundMonitor.isForeground.value) {
+                awaySegmentStart = Instant.now()
+            }
         }
         recompute()
         startTicking()
@@ -156,10 +208,12 @@ class SessionEngine @Inject constructor(
         val ended = mutex.withLock {
             val current = session ?: return
             val focused = computeFocusedSeconds()
+            endAwaySegment()
             val finished = current.copy(
                 status = SessionStatus.COMPLETED,
                 endedAt = Instant.now(),
                 focusedSeconds = focused,
+                awaySeconds = awayBanked,
             )
             session = null
             focusSegmentStart = null
@@ -170,7 +224,11 @@ class SessionEngine @Inject constructor(
         ticker?.cancel()
         ticker = null
         _state.value = null
-        Log.d(LOG_TAG, "SessionEngine.endSession(${ended.id}) focused=${ended.focusedSeconds}")
+        Log.d(
+            LOG_TAG,
+            "SessionEngine.endSession(${ended.id}) focused=${ended.focusedSeconds} " +
+                "away=${ended.awaySeconds}",
+        )
         _finishedSessions.tryEmit(ended.id)
 
         // Rating runs after the session is stored and the UI has been released, so a slow
@@ -251,6 +309,9 @@ class SessionEngine @Inject constructor(
             pauseStart = Instant.now()
             pauseType = type
             if (type == PauseType.PLANNED) plannedPausesTaken++
+            // A break is time the user is entitled to spend anywhere, so time away stops
+            // accruing the moment one starts.
+            endAwaySegment()
 
             Pause(
                 sessionId = current.id,
@@ -276,6 +337,8 @@ class SessionEngine @Inject constructor(
             pauseType = null
             openPauseId = null
             focusSegmentStart = now
+            // If they are still in another app when the break ends, they are away again.
+            if (!appForegroundMonitor.isForeground.value) awaySegmentStart = now
 
             Pause(
                 id = id,
@@ -332,6 +395,8 @@ class SessionEngine @Inject constructor(
                     ?.let { (it - focused).coerceAtLeast(0) },
                 hasPlannedPauses = plannedOffsets.isNotEmpty(),
                 plannedPausesRemaining = (plannedOffsets.size - plannedPausesTaken).coerceAtLeast(0),
+                awaySeconds = computeAwaySeconds(),
+                isAway = awaySegmentStart != null,
             )
         }
     }

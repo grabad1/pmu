@@ -39,12 +39,19 @@ object LocalSessionRater {
     private const val MAX_UNPLANNED_PENALTY = 25.0
     private const val EXCESS_PAUSE_PENALTY = 5.0
     private const val MAX_EXCESS_PAUSE_PENALTY = 15.0
+    private const val MAX_AWAY_PENALTY = 20.0
 
     /** A problem present for less than this share of the session is not held against anyone. */
     private const val ENVIRONMENT_GRACE = 0.2
 
     /** Unplanned breaks shorter than this are treated as life, not lost focus. */
     private const val UNPLANNED_GRACE_SECONDS = 120
+
+    /**
+     * Time in another app below this is not worth mentioning — glancing at a message that
+     * arrived is not the same as scrolling for ten minutes.
+     */
+    private const val AWAY_GRACE_SECONDS = 30
 
     fun rate(summary: SessionSummary): SessionRating {
         val score = score(summary)
@@ -73,10 +80,21 @@ object LocalSessionRater {
 
         val raw = goal + discipline + environment -
             unplannedPenalty(summary) -
-            excessPausePenalty(summary)
+            excessPausePenalty(summary) -
+            awayPenalty(summary)
 
         // However clean it was, a very short session is not evidence of sustained focus.
         return raw.coerceIn(0.0, ceilingForLength(summary).toDouble()).roundToInt()
+    }
+
+    /**
+     * Time in another app while the timer ran is the worst kind of lost focus, because unlike
+     * a pause the session went on claiming it. Scales with the share of focus time it
+     * displaced, after a short grace period for a glance at a message.
+     */
+    private fun awayPenalty(summary: SessionSummary): Double {
+        if (summary.awaySeconds <= AWAY_GRACE_SECONDS) return 0.0
+        return (summary.awayShare * 60).coerceAtMost(MAX_AWAY_PENALTY)
     }
 
     /** Nothing below the grace threshold counts; above it the excess scales to a full penalty. */
@@ -114,6 +132,9 @@ object LocalSessionRater {
 
     private fun comment(summary: SessionSummary, score: Int): String = when {
         summary.focusedMinutes < 5 -> "Far too short to build any real focus."
+
+        summary.awaySeconds > AWAY_GRACE_SECONDS && summary.awayShare > 0.25 ->
+            "You spent much of this session in another app."
 
         summary.excessPlannedPauses > 0 && score < 75 ->
             "Broken into too many breaks to build momentum."
@@ -171,5 +192,13 @@ object LocalSessionRater {
             if (problems.isEmpty()) "Your working conditions held up well."
             else "Worth fixing: ${problems.joinToString(", ")}."
         )
+
+        if (summary.awaySeconds > AWAY_GRACE_SECONDS) {
+            append(
+                " You also spent ${summary.awayDescription} in another app while the timer " +
+                    "was running — that is ${(summary.awayShare * 100).roundToInt()}% of the " +
+                    "focus this session claims, and the clearest thing to change next time."
+            )
+        }
     }
 }

@@ -9,6 +9,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import rs.etf.focusguard.data.SessionEngine
 import rs.etf.focusguard.data.SessionRepository
+import rs.etf.focusguard.util.AppForegroundMonitor
 import javax.inject.Inject
 
 const val LOG_TAG = "FocusGuard"
@@ -22,10 +23,15 @@ class FocusGuardApplication : Application() {
     @Inject
     lateinit var sessionEngine: SessionEngine
 
+    @Inject
+    lateinit var appForegroundMonitor: AppForegroundMonitor
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
         super.onCreate()
+        // Must be registered before anything asks whether the app is in front of the user.
+        appForegroundMonitor.start()
         resumeInterruptedSession()
         rateSessionsLeftUnscored()
     }

@@ -15,6 +15,7 @@ class LocalSessionRaterTest {
         plannedPausesTaken: Int = 0,
         unplannedPauseCount: Int = 0,
         unplannedPauseSeconds: Int = 0,
+        awaySeconds: Int = 0,
         darkFraction: Double = 0.0,
         loudFraction: Double = 0.0,
         movementFraction: Double = 0.0,
@@ -26,6 +27,7 @@ class LocalSessionRaterTest {
         plannedPausesTaken = plannedPausesTaken,
         unplannedPauseCount = unplannedPauseCount,
         unplannedPauseSeconds = unplannedPauseSeconds,
+        awaySeconds = awaySeconds,
         darkFraction = darkFraction,
         loudFraction = loudFraction,
         movementFraction = movementFraction,
@@ -196,6 +198,7 @@ class LocalSessionRaterTest {
             plannedPausesTaken = 0,
             unplannedPauseCount = 0,
             unplannedPauseSeconds = 0,
+            awaySeconds = 0,
             darkFraction = 0.0,
             loudFraction = 0.0,
             movementFraction = 0.0,
@@ -203,5 +206,32 @@ class LocalSessionRaterTest {
 
         // Most of a one-minute goal, but far too short to score well.
         assertTrue(LocalSessionRater.score(almost) in 1..60)
+    }
+
+    @Test
+    fun `a glance at another app is forgiven`() {
+        val clean = summary()
+        val glanced = summary(awaySeconds = 25)
+
+        assertEquals(LocalSessionRater.score(clean), LocalSessionRater.score(glanced))
+    }
+
+    @Test
+    fun `time spent in another app lowers the score`() {
+        val focused = summary()
+        val distracted = summary(awaySeconds = 10 * 60)
+
+        assertTrue(
+            "expected time away to cost points",
+            LocalSessionRater.score(distracted) < LocalSessionRater.score(focused),
+        )
+    }
+
+    @Test
+    fun `the away penalty is capped`() {
+        // Even an absurd amount of time away cannot wipe out a completed goal entirely.
+        val hopeless = summary(awaySeconds = 60 * 60)
+
+        assertTrue(LocalSessionRater.score(hopeless) >= 40)
     }
 }
