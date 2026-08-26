@@ -84,6 +84,14 @@ class FocusGuardAppViewModel @Inject constructor(
     /** Sessions the user has waved away this run, so the prompt does not nag. */
     private val dismissed = MutableStateFlow<Set<Long>>(emptySet())
 
+    /**
+     * Ticks only while something is collecting, which means only while the app is on screen —
+     * see the `WhileSubscribed` below. Nothing here runs in the background; the reminders are
+     * the alarm manager's job, and this is just the app noticing on reopening.
+     *
+     * Comparing two instants every ten seconds costs nothing measurable, and the window it is
+     * looking for is twenty minutes wide, so the cadence could be far slower still.
+     */
     private val clock = flow {
         while (true) {
             emit(Instant.now())
@@ -91,15 +99,25 @@ class FocusGuardAppViewModel @Inject constructor(
         }
     }
 
-    val dueSession = combine(
-        sessionRepository.scheduledSessions,
-        clock,
-        dismissed,
-    ) { scheduled, now, ignored ->
+    /**
+     * The scheduled session that is due right now, if any.
+     *
+     * Deliberately *not* filtered by what the user has dismissed: this feeds the button on the
+     * home screen, which must stay available for the whole window. Waving away the prompt
+     * should mean "not this second", not "never mention it again" — the session was found
+     * unjoinable after dismissing the dialog once, which is how a scheduled session could be
+     * missed while the app sat open in front of the user.
+     */
+    val dueSession = combine(sessionRepository.scheduledSessions, clock) { scheduled, now ->
         scheduled.firstOrNull { session ->
             val at = session.scheduledAt
-            session.id !in ignored && at != null && ScheduleWindow.isDue(at, now)
+            at != null && ScheduleWindow.isDue(at, now)
         }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** The same session, unless the prompt for it has been dismissed this run. */
+    val duePrompt = combine(dueSession, dismissed) { session, ignored ->
+        session?.takeIf { it.id !in ignored }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     fun dismissDueSession(sessionId: Long) {

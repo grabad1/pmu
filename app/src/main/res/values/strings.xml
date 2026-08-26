@@ -7,6 +7,10 @@
     <string name="home_new_session">New Session</string>
     <string name="home_scheduled_sessions">Scheduled Sessions</string>
     <string name="home_previous_sessions">Previous Sessions</string>
+    <string name="home_due_title">\"%1$s\" is due</string>
+    <string name="home_due_subtitle">Scheduled for %1$s · tap to begin</string>
+    <string name="home_due_now">Scheduled for now · tap to begin</string>
+    <string name="home_due_action">Start ▶</string>
 
     <!-- Screen titles -->
     <string name="new_session_title">New Session</string>

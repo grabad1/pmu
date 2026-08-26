@@ -1,8 +1,12 @@
 package rs.etf.focusguard.ui.elements.screens
 
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -12,6 +16,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
@@ -39,16 +44,21 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import rs.etf.focusguard.R
+import rs.etf.focusguard.data.room.Session
 import rs.etf.focusguard.interruptions.FocusGuardNotificationListener
 import rs.etf.focusguard.ui.elements.composables.PrimaryButton
 import rs.etf.focusguard.ui.elements.composables.SecondaryButton
 import rs.etf.focusguard.ui.elements.theme.Accent
 import rs.etf.focusguard.ui.elements.theme.AccentDim
 import rs.etf.focusguard.ui.elements.theme.TextSecondary
+import rs.etf.focusguard.util.formatTime
 
 @Composable
 fun HomeScreen(
@@ -56,6 +66,8 @@ fun HomeScreen(
     onScheduledSessions: () -> Unit,
     onPreviousSessions: () -> Unit,
     modifier: Modifier = Modifier,
+    dueSession: Session? = null,
+    onJoinDueSession: () -> Unit = {},
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         // The prototype lifts the header into place on arrival. It travels less on a short
@@ -130,6 +142,12 @@ fun HomeScreen(
                     .padding(top = 32.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                // Above the other actions, because a session that is due now is the most
+                // likely reason the app was opened at all.
+                dueSession?.let { session ->
+                    DueSessionButton(session = session, onClick = onJoinDueSession)
+                }
+
                 PrimaryButton(
                     text = stringResource(R.string.home_new_session),
                     onClick = onNewSession,
@@ -146,6 +164,65 @@ fun HomeScreen(
 
             NotificationAccessPrompt(modifier = Modifier.padding(top = 22.dp))
         }
+    }
+}
+
+/**
+ * Offers a scheduled session that is due right now.
+ *
+ * The prompt that appears on opening the app can be dismissed, and once it was, the session
+ * could not be started from the app at all until the next launch — so a scheduled session
+ * could be missed while sitting in front of the person who scheduled it. This stays for the
+ * whole window the session is joinable.
+ */
+@Composable
+private fun DueSessionButton(
+    session: Session,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val pulse by rememberInfiniteTransition(label = "dueSession").animateFloat(
+        initialValue = 0.55f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1_400),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "dueGlow",
+    )
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(AccentDim, RoundedCornerShape(14.dp))
+            .border(2.dp, Accent.copy(alpha = pulse), RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(text = "⏰", fontSize = 22.sp)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.home_due_title, session.name),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = Accent,
+            )
+            Text(
+                text = session.scheduledAt?.let {
+                    stringResource(R.string.home_due_subtitle, formatTime(it))
+                } ?: stringResource(R.string.home_due_now),
+                fontSize = 11.sp,
+                color = TextSecondary,
+            )
+        }
+        Text(
+            text = stringResource(R.string.home_due_action),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = Accent,
+        )
     }
 }
 

@@ -65,6 +65,7 @@ fun FocusGuardApp(
 
     val runningSession by viewModel.runningSession.collectAsStateWithLifecycle()
     val dueSession by viewModel.dueSession.collectAsStateWithLifecycle()
+    val duePrompt by viewModel.duePrompt.collectAsStateWithLifecycle()
     val finishedSession by viewModel.finishedSession.collectAsStateWithLifecycle()
     val finishedSessionDetail by
         viewModel.finishedSessionDetail.collectAsStateWithLifecycle()
@@ -112,6 +113,9 @@ fun FocusGuardApp(
                     onNewSession = { navController.navigateSafely(NewSession) },
                     onScheduledSessions = { navController.navigateSafely(ScheduledSessions) },
                     onPreviousSessions = { navController.navigateSafely(PreviousSessions) },
+                    // Nothing to join while a session is already running.
+                    dueSession = dueSession?.takeIf { runningSession == null },
+                    onJoinDueSession = { dueSession?.let(viewModel::joinSession) },
                 )
             }
             composable<NewSession> {
@@ -158,7 +162,9 @@ fun FocusGuardApp(
     }
 
     // Only offered when nothing is already running, so a due session cannot interrupt one.
-    dueSession?.takeIf { runningSession == null }?.let { session ->
+    // Dismissing this hides the prompt, not the session: the button on the home screen stays
+    // for as long as the session is joinable.
+    duePrompt?.takeIf { runningSession == null }?.let { session ->
         JoinSessionDialog(
             session = session,
             onJoin = { viewModel.joinSession(session) },
@@ -170,7 +176,8 @@ fun FocusGuardApp(
         SessionResultDialog(
             session = session,
             onDismiss = viewModel::dismissFinishedSession,
-            detail = finishedSessionDetail,        )
+            detail = finishedSessionDetail,
+        )
     }
 }
 
