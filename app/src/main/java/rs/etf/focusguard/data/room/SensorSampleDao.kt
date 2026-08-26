@@ -44,4 +44,49 @@ interface SensorSampleDao {
         """
     )
     suspend fun fractionAbove(sessionId: Long, kind: SensorKind, threshold: Float): Double?
+
+    /**
+     * The same two questions asked across every finished session matching a filter, so the
+     * history screen can say "for maths, the light was bad 10% of the time".
+     *
+     * Every stored sample counts equally, which is fair because sampling is periodic: a
+     * session twice as long contributes twice as many samples and so twice the weight.
+     */
+    @Query(
+        """
+        SELECT CAST(SUM(CASE WHEN ss.value < :threshold THEN 1 ELSE 0 END) AS REAL) / COUNT(*)
+        FROM sensor_samples ss
+        JOIN sessions s ON s.id = ss.sessionId
+        WHERE ss.kind = :kind AND s.status = 'COMPLETED'
+          AND s.id != :excludeSessionId
+          AND (:category IS NULL OR s.category = :category COLLATE NOCASE)
+          AND (:topic IS NULL OR s.topic = :topic COLLATE NOCASE)
+        """
+    )
+    suspend fun fractionBelowFiltered(
+        kind: SensorKind,
+        threshold: Float,
+        category: String?,
+        topic: String?,
+        excludeSessionId: Long = -1,
+    ): Double?
+
+    @Query(
+        """
+        SELECT CAST(SUM(CASE WHEN ss.value > :threshold THEN 1 ELSE 0 END) AS REAL) / COUNT(*)
+        FROM sensor_samples ss
+        JOIN sessions s ON s.id = ss.sessionId
+        WHERE ss.kind = :kind AND s.status = 'COMPLETED'
+          AND s.id != :excludeSessionId
+          AND (:category IS NULL OR s.category = :category COLLATE NOCASE)
+          AND (:topic IS NULL OR s.topic = :topic COLLATE NOCASE)
+        """
+    )
+    suspend fun fractionAboveFiltered(
+        kind: SensorKind,
+        threshold: Float,
+        category: String?,
+        topic: String?,
+        excludeSessionId: Long = -1,
+    ): Double?
 }

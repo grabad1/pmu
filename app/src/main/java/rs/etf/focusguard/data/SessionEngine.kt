@@ -241,7 +241,21 @@ class SessionEngine @Inject constructor(
         val samples = repository.getSensorSamples(sessionId)
         val summary = SessionSummary.from(withPauses, samples)
 
-        val rating = ratingRepository.rate(summary)
+        // How this user's earlier sessions on the same topic went, so the comment can place
+        // this one against their own history rather than judging it in isolation. Narrowest
+        // useful grouping: the topic if there is one, otherwise the category.
+        val session = withPauses.session
+        val baseline = if (session.topic != null || session.category != null) {
+            repository.summarise(
+                category = session.category,
+                topic = session.topic,
+                excludeSessionId = sessionId,
+            )
+        } else {
+            null
+        }
+
+        val rating = ratingRepository.rate(summary, baseline)
         repository.saveRating(sessionId, rating)
         Log.d(LOG_TAG, "Rated session $sessionId: ${rating.score} — ${rating.comment}")
         _ratedSessions.tryEmit(sessionId)

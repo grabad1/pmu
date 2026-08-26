@@ -6,12 +6,19 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.parcelize.Parcelize
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import rs.etf.focusguard.data.SessionRepository
 import rs.etf.focusguard.alarms.SessionAlarmScheduler
 import rs.etf.focusguard.data.room.Session
 import rs.etf.focusguard.data.room.SessionStatus
+import rs.etf.focusguard.util.PRESET_CATEGORIES
 import rs.etf.focusguard.util.atTimeToInstant
+import rs.etf.focusguard.util.normaliseLabel
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -24,6 +31,10 @@ import javax.inject.Inject
 @Parcelize
 data class NewSessionUiState(
     val name: String = "",
+    val category: String? = null,
+    val topic: String = "",
+    val isAddingCategory: Boolean = false,
+    val customCategory: String = "",
     val goalMinutes: String = "45",
     val pauseCount: String = "2",
     val pauseMinutes: String = "5",
@@ -49,6 +60,16 @@ data class NewSessionUiState(
     val scheduleTime: LocalTime get() = LocalTime.of(scheduleHour, scheduleMinute)
 
     val scheduleInstant: Instant get() = scheduleDate.atTimeToInstant(scheduleTime)
+
+    /**
+     * The category to store: whatever was typed if the user is adding their own, otherwise
+     * the selected chip. Blank counts as not set, so an abandoned custom field cannot store
+     * an empty category that would then reappear as a suggestion.
+     */
+    val effectiveCategory: String?
+        get() = if (isAddingCategory) normaliseLabel(customCategory) else normaliseLabel(category)
+
+    val effectiveTopic: String? get() = normaliseLabel(topic)
 }
 
 @HiltViewModel
@@ -66,11 +87,49 @@ class NewSessionViewModel @Inject constructor(
 
     val scheduledSessions = sessionRepository.scheduledSessions
 
+    /** Preset categories plus any the user has invented before, without duplicates. */
+    val categories: Flow<List<String>> = sessionRepository.usedCategories.map { used ->
+        val known = PRESET_CATEGORIES.toMutableList()
+        used.forEach { category ->
+            if (known.none { it.equals(category, ignoreCase = true) }) known += category
+        }
+        known
+    }
+
+    /**
+     * Topics already used in the chosen category, offered as one-tap suggestions.
+     *
+     * Driven by the selected category so the suggestions stay relevant: the topics under
+     * "Studying" are not the ones under "Yoga".
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val topicSuggestions: Flow<List<String>> = uiState
+        .map { it.effectiveCategory }
+        .distinctUntilChanged()
+        .flatMapLatest { category -> sessionRepository.usedTopics(category) }
+
     private fun update(transform: (NewSessionUiState) -> NewSessionUiState) {
         savedStateHandle[UI_STATE_KEY] = transform(uiState.value)
     }
 
     fun onNameChange(value: String) = update { it.copy(name = value) }
+
+    /** Tapping the selected category again clears it — categorising stays optional. */
+    fun onCategorySelect(value: String) = update {
+        if (it.category.equals(value, ignoreCase = true) && !it.isAddingCategory) {
+            it.copy(category = null)
+        } else {
+            it.copy(category = value, isAddingCategory = false)
+        }
+    }
+
+    fun onAddOwnCategory() = update {
+        it.copy(isAddingCategory = !it.isAddingCategory, category = null)
+    }
+
+    fun onCustomCategoryChange(value: String) = update { it.copy(customCategory = value) }
+
+    fun onTopicChange(value: String) = update { it.copy(topic = value) }
 
     fun onGoalMinutesChange(value: String) = update { it.copy(goalMinutes = value.digitsOnly()) }
 
@@ -113,6 +172,8 @@ class NewSessionViewModel @Inject constructor(
             val id = sessionRepository.insertSession(
                 Session(
                     name = state.name.trim().ifBlank { "New Session" },
+                    category = state.effectiveCategory,
+                    topic = state.effectiveTopic,
                     goalMinutes = state.goalMinutesOrDefault,
                     plannedPauseCount = state.pauseCountOrZero,
                     plannedPauseMinutes = state.pauseMinutesOrZero,
@@ -155,6 +216,8 @@ class NewSessionViewModel @Inject constructor(
 
             val scheduled = Session(
                 name = name,
+                category = state.effectiveCategory,
+                topic = state.effectiveTopic,
                 goalMinutes = state.goalMinutesOrDefault,
                 plannedPauseCount = state.pauseCountOrZero,
                 plannedPauseMinutes = state.pauseMinutesOrZero,

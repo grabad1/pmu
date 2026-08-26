@@ -27,6 +27,7 @@ enum class PauseType {
 
 /** Which physical sensor produced a sample. */
 enum class SensorKind {
+
     /** Ambient light, in lux. */
     LIGHT,
 
@@ -38,4 +39,19 @@ enum class SensorKind {
 
     /** Angular velocity magnitude, in rad/s. Turning a phone means holding it. */
     ROTATION,
+}
+
+/**
+ * What interrupted the user from outside the app.
+ *
+ * These are recorded but deliberately never scored — an incoming call is not a choice the
+ * user made, and the rubric already forgives short interruptions. They exist to produce
+ * advice ("this app interrupted you six times"), not a penalty.
+ */
+enum class InterruptionKind {
+    /** An incoming phone call, ringing or answered. */
+    CALL,
+
+    /** A notification posted by another app. */
+    NOTIFICATION,
 }

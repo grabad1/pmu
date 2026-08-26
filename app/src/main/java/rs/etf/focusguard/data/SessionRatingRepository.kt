@@ -27,7 +27,7 @@ class SessionRatingRepository @Inject constructor(
 
     val isAiConfigured: Boolean get() = apiKey.isNotBlank()
 
-    suspend fun rate(summary: SessionSummary): SessionRating {
+    suspend fun rate(summary: SessionSummary, baseline: TopicSummary? = null): SessionRating {
         val local = LocalSessionRater.rate(summary)
 
         if (!isAiConfigured) {
@@ -35,17 +35,20 @@ class SessionRatingRepository @Inject constructor(
             return local
         }
 
-        return runCatching { requestAiRating(summary) }
+        return runCatching { requestAiRating(summary, baseline) }
             .onFailure { Log.w(LOG_TAG, "Gemini rating failed: ${it.message}") }
             .getOrNull()
             ?: local
     }
 
-    private suspend fun requestAiRating(summary: SessionSummary): SessionRating? {
+    private suspend fun requestAiRating(
+        summary: SessionSummary,
+        baseline: TopicSummary?,
+    ): SessionRating? {
         val response = geminiApi.generateContent(
             model = GeminiApi.DEFAULT_MODEL,
             apiKey = apiKey,
-            request = GeminiRequest.ofPrompt(buildPrompt(summary)),
+            request = GeminiRequest.ofPrompt(buildPrompt(summary, baseline)),
         )
 
         val text = response.text?.trim()
@@ -78,7 +81,7 @@ class SessionRatingRepository @Inject constructor(
      * what a good session is. The local score itself is deliberately withheld: an independent
      * judgement is more useful than a rubber stamp.
      */
-    private fun buildPrompt(summary: SessionSummary): String = buildString {
+    private fun buildPrompt(summary: SessionSummary, baseline: TopicSummary?): String = buildString {
         appendLine(
             "You are reviewing one focus session from a productivity app that helps someone " +
                 "study without touching their phone. Judge it and reply with JSON only."
@@ -108,6 +111,36 @@ class SessionRatingRepository @Inject constructor(
                 "${summary.awayDescription}, which is " +
                 "${(summary.awayShare * 100).roundToInt()}% of the focus time claimed"
         )
+
+        // Only offered once there is a real history to compare against: with one or two
+        // sessions an "average" is barely more than this session repeated back.
+        if (baseline != null && baseline.sessionCount >= 2) {
+            appendLine()
+            appendLine(
+                "For context, how this user's previous ${baseline.label.lowercase()} sessions " +
+                    "have gone (${baseline.sessionCount} earlier sessions, this one excluded):"
+            )
+            baseline.averageScore?.let { appendLine("- Their usual score: $it out of 100") }
+            appendLine(
+                "- Usual focus time: ${(baseline.averageFocusedSeconds / 60.0).roundToInt()} " +
+                    "minutes against a usual goal of ${baseline.averageGoalMinutes} minutes"
+            )
+            appendLine(
+                "- Usual unplanned breaks: " +
+                    String.format("%.1f", baseline.averageUnplannedPauses) + " per session"
+            )
+            appendLine(
+                "- Usual conditions: phone handled ${baseline.movementFraction.asPercent()}, " +
+                    "noisy ${baseline.loudFraction.asPercent()}, " +
+                    "poor light ${baseline.darkFraction.asPercent()} of readings"
+            )
+            appendLine(
+                "Use this only to make the comment and analysis more useful — say whether " +
+                    "this session was better or worse than their usual, and mention any " +
+                    "pattern that keeps recurring. Do NOT change the score because of it: " +
+                    "the score must reflect this session alone, judged by the rules below."
+            )
+        }
         appendLine()
         appendLine("How to score it, in order of importance:")
         appendLine(

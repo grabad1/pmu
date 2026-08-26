@@ -24,10 +24,13 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import rs.etf.focusguard.R
+import rs.etf.focusguard.ui.elements.composables.ChipRow
 import rs.etf.focusguard.ui.elements.composables.FormField
+import rs.etf.focusguard.ui.elements.composables.FormLabel
 import rs.etf.focusguard.ui.elements.composables.PrimaryButton
 import rs.etf.focusguard.ui.elements.composables.ScreenHeader
 import rs.etf.focusguard.ui.elements.composables.SecondaryButton
+import rs.etf.focusguard.ui.elements.composables.SelectableChip
 import rs.etf.focusguard.ui.elements.theme.Accent
 import rs.etf.focusguard.ui.elements.theme.AccentDim
 import rs.etf.focusguard.ui.elements.theme.TextSecondary
@@ -43,6 +46,9 @@ fun NewSessionScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scheduled by viewModel.scheduledSessions.collectAsStateWithLifecycle(initialValue = emptyList())
+    val categories by viewModel.categories.collectAsStateWithLifecycle(initialValue = emptyList())
+    val topicSuggestions by viewModel.topicSuggestions
+        .collectAsStateWithLifecycle(initialValue = emptyList())
 
     Column(modifier = modifier.fillMaxSize()) {
         ScreenHeader(title = stringResource(R.string.new_session_title), onBack = onBack)
@@ -61,6 +67,23 @@ fun NewSessionScreen(
                 onValueChange = viewModel::onNameChange,
                 placeholder = stringResource(R.string.field_session_name_hint),
             )
+
+            CategoryPicker(
+                categories = categories,
+                selected = uiState.category,
+                isAddingOwn = uiState.isAddingCategory,
+                customValue = uiState.customCategory,
+                onSelect = viewModel::onCategorySelect,
+                onAddOwn = viewModel::onAddOwnCategory,
+                onCustomChange = viewModel::onCustomCategoryChange,
+            )
+
+            TopicField(
+                value = uiState.topic,
+                suggestions = topicSuggestions,
+                onValueChange = viewModel::onTopicChange,
+            )
+
             FormField(
                 label = stringResource(R.string.field_goal_time),
                 value = uiState.goalMinutes,
@@ -121,6 +144,94 @@ fun NewSessionScreen(
             onConfirm = { viewModel.schedule(onScheduled) },
             onDismiss = viewModel::closeScheduleDialog,
         )
+    }
+}
+
+/**
+ * Category chips: the presets, anything the user has invented before, and a way to invent
+ * another. Choosing nothing is allowed — a session without a category is still a session.
+ */
+@Composable
+private fun CategoryPicker(
+    categories: List<String>,
+    selected: String?,
+    isAddingOwn: Boolean,
+    customValue: String,
+    onSelect: (String) -> Unit,
+    onAddOwn: () -> Unit,
+    onCustomChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FormLabel(stringResource(R.string.field_category))
+
+        ChipRow {
+            categories.forEach { category ->
+                SelectableChip(
+                    text = category,
+                    selected = !isAddingOwn && selected.equals(category, ignoreCase = true),
+                    onClick = { onSelect(category) },
+                )
+            }
+            SelectableChip(
+                text = stringResource(R.string.category_add_own),
+                selected = isAddingOwn,
+                onClick = onAddOwn,
+            )
+        }
+
+        if (isAddingOwn) {
+            FormField(
+                label = stringResource(R.string.field_custom_category),
+                value = customValue,
+                onValueChange = onCustomChange,
+                placeholder = stringResource(R.string.field_custom_category_hint),
+            )
+        }
+    }
+}
+
+/**
+ * Free-text topic with one-tap suggestions drawn from what has been used before, so "Math"
+ * stays one topic instead of becoming three spellings that never group together.
+ */
+@Composable
+private fun TopicField(
+    value: String,
+    suggestions: List<String>,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FormField(
+            label = stringResource(R.string.field_topic),
+            value = value,
+            onValueChange = onValueChange,
+            placeholder = stringResource(R.string.field_topic_hint),
+        )
+
+        if (suggestions.isNotEmpty()) {
+            Text(
+                text = stringResource(R.string.topic_suggestions),
+                style = MaterialTheme.typography.labelSmall,
+                color = TextSecondary,
+            )
+            ChipRow {
+                suggestions.forEach { suggestion ->
+                    SelectableChip(
+                        text = suggestion,
+                        selected = value.trim().equals(suggestion, ignoreCase = true),
+                        onClick = { onValueChange(suggestion) },
+                    )
+                }
+            }
+        }
     }
 }
 

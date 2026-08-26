@@ -32,4 +32,11 @@ class Converters {
 
     @TypeConverter
     fun sensorKindToName(kind: SensorKind?): String? = kind?.name
+
+    @TypeConverter
+    fun interruptionKindFromName(value: String?): InterruptionKind? =
+        value?.let(InterruptionKind::valueOf)
+
+    @TypeConverter
+    fun interruptionKindToName(kind: InterruptionKind?): String? = kind?.name
 }

@@ -22,6 +22,13 @@
     <string name="field_pause_duration">Pause Duration (min)</string>
     <string name="field_date">Date</string>
     <string name="field_time">Time</string>
+    <string name="field_category">Category</string>
+    <string name="field_topic">Topic</string>
+    <string name="field_topic_hint">e.g. Math</string>
+    <string name="field_custom_category">Category name</string>
+    <string name="field_custom_category_hint">e.g. Guitar</string>
+    <string name="category_add_own">+ Own</string>
+    <string name="topic_suggestions">Used before:</string>
 
     <!-- Actions -->
     <string name="action_start">▶  Start</string>
@@ -82,6 +89,20 @@
     </plurals>
     <string name="previous_card_footer">Tap card for AI analysis</string>
     <string name="previous_empty">No finished sessions yet.\nStart one to see it here.</string>
+    <string name="previous_empty_filtered">Nothing here yet.\nNo sessions match this filter.</string>
+
+    <!-- Per-topic summary -->
+    <plurals name="summary_session_count">
+        <item quantity="one">%1$d session · average</item>
+        <item quantity="other">%1$d sessions · average</item>
+    </plurals>
+    <string name="summary_avg_focus">Avg Focus</string>
+    <string name="summary_avg_pauses">Avg Pauses</string>
+    <string name="summary_pause_split">%1$.1f planned · %2$.1f unplanned</string>
+    <string name="summary_conditions">Conditions</string>
+    <string name="summary_dark">Dark %1$d%%</string>
+    <string name="summary_loud">Loud %1$d%%</string>
+    <string name="summary_moving">Moving %1$d%%</string>
 
     <!-- Pause log -->
     <string name="pause_log_title">Pause Log</string>

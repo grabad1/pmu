@@ -10,10 +10,12 @@ import rs.etf.focusguard.data.room.Session
 import rs.etf.focusguard.data.room.SessionDao
 import rs.etf.focusguard.data.room.SessionStatus
 import rs.etf.focusguard.data.room.SessionWithPauses
+import rs.etf.focusguard.sensors.EnvironmentThresholds
 import java.time.Duration
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.roundToInt
 
 /**
  * Single entry point to stored session data. ViewModels and the session service talk to this
@@ -30,6 +32,16 @@ class SessionRepository @Inject constructor(
     val completedSessions = sessionDao.getCompletedAsFlow()
     val completedSessionsWithPauses = sessionDao.getCompletedWithPausesAsFlow()
     val runningSession = sessionDao.getRunningAsFlow()
+
+    /** Categories the user has actually used, for suggestions and history filtering. */
+    val usedCategories = sessionDao.getCategoriesAsFlow()
+
+    /** Topics used, optionally narrowed to one category. */
+    fun usedTopics(category: String? = null) = sessionDao.getTopicsAsFlow(category)
+
+    /** Finished sessions narrowed by category and/or topic; nulls mean "any". */
+    fun completedSessionsFiltered(category: String?, topic: String?) =
+        sessionDao.getCompletedWithPausesFiltered(category, topic)
 
     suspend fun getSession(id: Long): Session? = sessionDao.getById(id)
 
@@ -107,4 +119,51 @@ class SessionRepository @Inject constructor(
 
     suspend fun fractionAbove(sessionId: Long, kind: SensorKind, threshold: Float): Double =
         sensorSampleDao.fractionAbove(sessionId, kind, threshold) ?: 0.0
+
+    /**
+     * Averages across every finished session matching a filter. Null category and topic give
+     * the user's overall baseline, which is what a single topic gets compared against.
+     *
+     * [excludeSessionId] leaves one session out. Rating uses it so a finished session is
+     * compared against the ones *before* it rather than against an average it is itself part
+     * of — with a handful of sessions, including it would flatten the very difference the
+     * comparison is meant to show.
+     */
+    suspend fun summarise(
+        category: String? = null,
+        topic: String? = null,
+        excludeSessionId: Long = -1,
+    ): TopicSummary {
+        val totals = sessionDao.aggregate(category, topic, excludeSessionId)
+        if (totals.sessionCount == 0) return TopicSummary.empty(category, topic)
+
+        val planned = pauseDao.countByTypeFiltered(
+            PauseType.PLANNED, category, topic, excludeSessionId,
+        )
+        val unplanned = pauseDao.countByTypeFiltered(
+            PauseType.UNPLANNED, category, topic, excludeSessionId,
+        )
+
+        return TopicSummary(
+            category = category,
+            topic = topic,
+            sessionCount = totals.sessionCount,
+            averageScore = totals.avgScore?.roundToInt(),
+            averageFocusedSeconds = totals.avgFocusedSeconds?.roundToInt() ?: 0,
+            averageGoalMinutes = totals.avgGoalMinutes?.roundToInt() ?: 0,
+            averagePlannedPauses = planned.toDouble() / totals.sessionCount,
+            averageUnplannedPauses = unplanned.toDouble() / totals.sessionCount,
+            darkFraction = sensorSampleDao.fractionBelowFiltered(
+                SensorKind.LIGHT, EnvironmentThresholds.DARK_LUX, category, topic, excludeSessionId,
+            ) ?: 0.0,
+            loudFraction = sensorSampleDao.fractionAboveFiltered(
+                SensorKind.NOISE, EnvironmentThresholds.LOUD_DB, category, topic, excludeSessionId,
+            ) ?: 0.0,
+            movementFraction = sensorSampleDao.fractionAboveFiltered(
+                SensorKind.MOTION, EnvironmentThresholds.MOVEMENT_MS2, category, topic,
+                excludeSessionId,
+            ) ?: 0.0,
+            totalAwaySeconds = totals.totalAwaySeconds,
+        )
+    }
 }

@@ -18,6 +18,20 @@ data class Session(
 
     val name: String,
 
+    /**
+     * Broad kind of session — "Studying", "Yoga", "Work". Free text rather than an enum so
+     * the user can add their own; the form offers a preset list plus whatever they have used
+     * before. Null on sessions created before categories existed.
+     */
+    val category: String? = null,
+
+    /**
+     * What the session was actually about within its category — "Math", "Operating Systems".
+     * This is the unit the history screen aggregates over, so someone can ask how their maths
+     * sessions go compared with everything else.
+     */
+    val topic: String? = null,
+
     /** Target focus time in minutes, excluding planned pauses. */
     val goalMinutes: Int,
 

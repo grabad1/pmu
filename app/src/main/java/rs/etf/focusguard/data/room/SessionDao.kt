@@ -87,4 +87,82 @@ interface SessionDao {
         """
     )
     suspend fun getUnrated(): List<Session>
+
+    /**
+     * Categories and topics the user has actually used, for the form's suggestions and the
+     * history filter. Compared case-insensitively so "Math" and "math" are one topic.
+     */
+    @Query(
+        """
+        SELECT DISTINCT category FROM sessions
+        WHERE category IS NOT NULL AND TRIM(category) != ''
+        ORDER BY category COLLATE NOCASE ASC
+        """
+    )
+    fun getCategoriesAsFlow(): Flow<List<String>>
+
+    @Query(
+        """
+        SELECT DISTINCT topic FROM sessions
+        WHERE topic IS NOT NULL AND TRIM(topic) != ''
+          AND (:category IS NULL OR category = :category COLLATE NOCASE)
+        ORDER BY topic COLLATE NOCASE ASC
+        """
+    )
+    fun getTopicsAsFlow(category: String?): Flow<List<String>>
+
+    /**
+     * Finished sessions narrowed to a category and/or topic. A null filter means "any",
+     * which keeps one query serving the unfiltered list as well.
+     */
+    @Transaction
+    @Query(
+        """
+        SELECT * FROM sessions
+        WHERE status = 'COMPLETED'
+          AND (:category IS NULL OR category = :category COLLATE NOCASE)
+          AND (:topic IS NULL OR topic = :topic COLLATE NOCASE)
+        ORDER BY endedAt DESC
+        """
+    )
+    fun getCompletedWithPausesFiltered(
+        category: String?,
+        topic: String?,
+    ): Flow<List<SessionWithPauses>>
+
+    /**
+     * Session-level averages for a filter — the "how do my maths sessions go" numbers.
+     * Sensor and pause averages are gathered separately and assembled in the repository,
+     * because one query doing all of it would be unreadable and hard to trust.
+     */
+    @Query(
+        """
+        SELECT COUNT(*) AS sessionCount,
+               AVG(focusScore) AS avgScore,
+               AVG(focusedSeconds) AS avgFocusedSeconds,
+               AVG(goalMinutes) AS avgGoalMinutes,
+               COALESCE(SUM(focusedSeconds), 0) AS totalFocusedSeconds,
+               COALESCE(SUM(awaySeconds), 0) AS totalAwaySeconds
+        FROM sessions
+        WHERE status = 'COMPLETED'
+          AND id != :excludeSessionId
+          AND (:category IS NULL OR category = :category COLLATE NOCASE)
+          AND (:topic IS NULL OR topic = :topic COLLATE NOCASE)
+        """
+    )
+    suspend fun aggregate(
+        category: String?,
+        topic: String?,
+        excludeSessionId: Long = -1,
+    ): SessionAggregate
 }
+
+/** Raw session-level averages behind a topic summary. */
+data class SessionAggregate(
+    val sessionCount: Int,
+    val avgScore: Double?,
+    val avgFocusedSeconds: Double?,
+    val avgGoalMinutes: Double?,
+    val totalFocusedSeconds: Int,
+    val totalAwaySeconds: Int,
+)

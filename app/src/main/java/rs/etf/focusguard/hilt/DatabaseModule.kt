@@ -29,4 +29,8 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun providesSensorSampleDao(database: FocusGuardDatabase) = database.sensorSampleDao()
+
+    @Provides
+    @Singleton
+    fun providesInterruptionDao(database: FocusGuardDatabase) = database.interruptionDao()
 }
