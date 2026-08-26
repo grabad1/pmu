@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import rs.etf.focusguard.data.DemoDataSeeder
 import rs.etf.focusguard.data.SessionEngine
 import rs.etf.focusguard.data.SessionRepository
 import rs.etf.focusguard.util.AppForegroundMonitor
@@ -26,14 +27,26 @@ class FocusGuardApplication : Application() {
     @Inject
     lateinit var appForegroundMonitor: AppForegroundMonitor
 
+    @Inject
+    lateinit var demoDataSeeder: DemoDataSeeder
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
         super.onCreate()
         // Must be registered before anything asks whether the app is in front of the user.
         appForegroundMonitor.start()
+        seedDemoDataOnFirstRun()
         resumeInterruptedSession()
         rateSessionsLeftUnscored()
+    }
+
+    /**
+     * Gives a fresh install something to show. Does nothing at all unless the database is
+     * completely empty, and nothing ever in a release build — see [DemoDataSeeder].
+     */
+    private fun seedDemoDataOnFirstRun() {
+        scope.launch { demoDataSeeder.seedIfEmpty() }
     }
 
     /**

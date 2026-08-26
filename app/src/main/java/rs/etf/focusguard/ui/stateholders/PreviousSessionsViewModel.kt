@@ -64,13 +64,13 @@ class PreviousSessionsViewModel @Inject constructor(
         }
     }
 
-    val categories = sessionRepository.usedCategories
+    val categories = sessionRepository.historyCategories
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val topics: Flow<List<String>> = uiState
         .map { it.categoryFilter }
         .distinctUntilChanged()
-        .flatMapLatest { category -> sessionRepository.usedTopics(category) }
+        .flatMapLatest { category -> sessionRepository.historyTopics(category) }
 
     fun showPauseLog(sessionId: Long) = update { it.copy(pauseLogSessionId = sessionId) }
 

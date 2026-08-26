@@ -39,11 +39,19 @@ class SessionRepository @Inject constructor(
     /** Topics used, optionally narrowed to one category. */
     fun usedTopics(category: String? = null) = sessionDao.getTopicsAsFlow(category)
 
+    /** The same, but only what appears on finished sessions — see [SessionDao]. */
+    val historyCategories = sessionDao.getCompletedCategoriesAsFlow()
+
+    fun historyTopics(category: String? = null) = sessionDao.getCompletedTopicsAsFlow(category)
+
     /** Finished sessions narrowed by category and/or topic; nulls mean "any". */
     fun completedSessionsFiltered(category: String?, topic: String?) =
         sessionDao.getCompletedWithPausesFiltered(category, topic)
 
     suspend fun getSession(id: Long): Session? = sessionDao.getById(id)
+
+    /** Used only to decide whether a fresh install has anything in it yet. */
+    suspend fun countSessions(): Int = sessionDao.count()
 
     fun getSessionAsFlow(id: Long) = sessionDao.getByIdAsFlow(id)
 

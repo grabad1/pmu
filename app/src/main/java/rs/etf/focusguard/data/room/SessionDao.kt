@@ -24,6 +24,9 @@ interface SessionDao {
     @Query("SELECT * FROM sessions WHERE id = :id")
     suspend fun getById(id: Long): Session?
 
+    @Query("SELECT COUNT(*) FROM sessions")
+    suspend fun count(): Int
+
     @Query("SELECT * FROM sessions WHERE id = :id")
     fun getByIdAsFlow(id: Long): Flow<Session?>
 
@@ -91,6 +94,11 @@ interface SessionDao {
     /**
      * Categories and topics the user has actually used, for the form's suggestions and the
      * history filter. Compared case-insensitively so "Math" and "math" are one topic.
+     *
+     * The form offers everything ever used, including on sessions merely scheduled — having
+     * planned a "Compilers" session is exactly when you want it suggested again. The history
+     * filter uses the COMPLETED variants below, because offering a filter that can only ever
+     * produce an empty list is a dead end.
      */
     @Query(
         """
@@ -110,6 +118,25 @@ interface SessionDao {
         """
     )
     fun getTopicsAsFlow(category: String?): Flow<List<String>>
+
+    @Query(
+        """
+        SELECT DISTINCT category FROM sessions
+        WHERE status = 'COMPLETED' AND category IS NOT NULL AND TRIM(category) != ''
+        ORDER BY category COLLATE NOCASE ASC
+        """
+    )
+    fun getCompletedCategoriesAsFlow(): Flow<List<String>>
+
+    @Query(
+        """
+        SELECT DISTINCT topic FROM sessions
+        WHERE status = 'COMPLETED' AND topic IS NOT NULL AND TRIM(topic) != ''
+          AND (:category IS NULL OR category = :category COLLATE NOCASE)
+        ORDER BY topic COLLATE NOCASE ASC
+        """
+    )
+    fun getCompletedTopicsAsFlow(category: String?): Flow<List<String>>
 
     /**
      * Finished sessions narrowed to a category and/or topic. A null filter means "any",
