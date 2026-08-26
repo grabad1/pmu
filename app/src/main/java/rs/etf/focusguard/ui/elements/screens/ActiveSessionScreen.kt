@@ -126,7 +126,7 @@ fun ActiveSessionScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val toasts by viewModel.toasts.collectAsStateWithLifecycle()
-    val showBigWarning by viewModel.showBigWarning.collectAsStateWithLifecycle()
+    val bigWarning by viewModel.bigWarning.collectAsStateWithLifecycle()
     var showEndDialog by remember { mutableStateOf(false) }
     var hasSeenSession by remember { mutableStateOf(false) }
 
@@ -179,8 +179,11 @@ fun ActiveSessionScreen(
                 .padding(top = 6.dp),
         )
 
-        if (showBigWarning) {
-            BigWarningOverlay(onDismiss = viewModel::dismissBigWarning)
+        bigWarning?.let { kind ->
+            BigWarningOverlay(
+                messageResId = kind.bigWarningResId(),
+                onDismiss = viewModel::dismissBigWarning,
+            )
         }
     }
 
@@ -481,6 +484,18 @@ private fun SessionRuntimeState.statusText(): String = when {
 private fun WarningKind.toToastData(): WarningToastData = when (this) {
     WarningKind.BAD_LIGHT -> WarningToastData("💡", R.string.warning_bad_light)
     WarningKind.LOUD_ROOM -> WarningToastData("🔊", R.string.warning_loud_room)
-    // Movement is shown full screen; this exists only for exhaustiveness.
+    WarningKind.FLICKERING_LIGHT -> WarningToastData("🔆", R.string.warning_flickering_light)
+    WarningKind.RESTLESS_NOISE -> WarningToastData("🗣️", R.string.warning_restless_noise)
+    // The two handling warnings are shown full screen; these exist only for exhaustiveness.
     WarningKind.MOVEMENT -> WarningToastData("🚫", R.string.warning_movement_toast)
+    WarningKind.FIDGETING -> WarningToastData("🚫", R.string.warning_fidgeting_toast)
+}
+
+/**
+ * Wording for the full-screen warnings. One pick-up and a habit of picking the phone up
+ * deserve different sentences: the first interrupts a reach, the second names a pattern.
+ */
+private fun WarningKind.bigWarningResId(): Int = when (this) {
+    WarningKind.FIDGETING -> R.string.warning_fidgeting_big
+    else -> R.string.warning_movement_big
 }

@@ -51,7 +51,26 @@ class EnvironmentMonitor @Inject constructor(
             sustainSeconds = EnvironmentThresholds.MOVEMENT_SUSTAIN_SECONDS,
             cooldownSeconds = EnvironmentThresholds.COOLDOWN_SECONDS,
         ),
+        // Patterns are measured over their own window, so they need no further sustain: by
+        // the time the rule is true it has already been true for the length of the window.
+        WarningKind.FLICKERING_LIGHT to ConditionTracker(
+            sustainSeconds = 0L,
+            cooldownSeconds = EnvironmentThresholds.COOLDOWN_SECONDS,
+        ),
+        WarningKind.RESTLESS_NOISE to ConditionTracker(
+            sustainSeconds = 0L,
+            cooldownSeconds = EnvironmentThresholds.COOLDOWN_SECONDS,
+        ),
+        WarningKind.FIDGETING to ConditionTracker(
+            sustainSeconds = 0L,
+            cooldownSeconds = EnvironmentThresholds.FIDGET_COOLDOWN_SECONDS,
+        ),
     )
+
+    /** Recent readings, for the rules that judge behaviour rather than level. */
+    private val lightWindow = ReadingWindow(EnvironmentThresholds.FLICKER_WINDOW_SECONDS)
+    private val noiseWindow = ReadingWindow(EnvironmentThresholds.RESTLESS_WINDOW_SECONDS)
+    private val movementEvents = ReadingWindow(EnvironmentThresholds.FIDGET_WINDOW_SECONDS)
 
     /** Most recent reading per sensor, used for conditions that change slowly. */
     private val latest = java.util.concurrent.ConcurrentHashMap<SensorKind, Float>()
@@ -75,6 +94,9 @@ class EnvironmentMonitor @Inject constructor(
         latest.clear()
         peakSinceEvaluation.clear()
         peakSinceSample.clear()
+        lightWindow.clear()
+        noiseWindow.clear()
+        movementEvents.clear()
         startEvaluating()
     }
 
@@ -84,6 +106,9 @@ class EnvironmentMonitor @Inject constructor(
         latest.clear()
         peakSinceEvaluation.clear()
         peakSinceSample.clear()
+        lightWindow.clear()
+        noiseWindow.clear()
+        movementEvents.clear()
     }
 
     /**
@@ -102,6 +127,15 @@ class EnvironmentMonitor @Inject constructor(
         latest[kind] = value
         peakSinceEvaluation.merge(kind, value, ::maxOf)
         peakSinceSample.merge(kind, value, ::maxOf)
+
+        // Patterns need every reading, not one a second: a lamp flickering twice between
+        // ticks is invisible to anything that only looks at the latest value.
+        val nowSeconds = System.nanoTime() / 1_000_000_000L
+        when (kind) {
+            SensorKind.LIGHT -> lightWindow.add(nowSeconds, value)
+            SensorKind.NOISE -> noiseWindow.add(nowSeconds, value)
+            else -> Unit
+        }
     }
 
     /**
@@ -141,10 +175,14 @@ class EnvironmentMonitor @Inject constructor(
         if (state == null || state.isPaused) {
             peakSinceEvaluation.clear()
             peakSinceSample.clear()
-            // Telling every tracker the condition is clear restarts its sustain window, so a
-            // dark room must be dark for another full window of *focus* before it warns.
-            // Cooldowns deliberately survive: a warning given just before a break is still
-            // recent when the break ends.
+            // Windows are emptied too: a conversation during a break must not still be
+            // "recent" when focus resumes, for the same reason peaks are discarded.
+            lightWindow.clear()
+            noiseWindow.clear()
+            // Pick-ups are deliberately *not* cleared. Handling the phone during a break is
+            // fine and never warns, but someone who picks it up four times either side of a
+            // two-minute break is still fidgeting.
+            movementEvents.prune(nowSeconds)
             trackers.values.forEach { it.update(violating = false, nowSeconds = nowSeconds) }
             return false
         }
@@ -169,17 +207,82 @@ class EnvironmentMonitor @Inject constructor(
 
         if (motionPeak != null || rotationPeak != null) {
             val reported = if (turned && !moved) rotationPeak ?: 0f else motionPeak ?: 0f
-            raiseIf(WarningKind.MOVEMENT, moved || turned, nowSeconds, reported)
+            if (moved || turned) movementEvents.add(nowSeconds, 1f)
+            raiseMovement(moved || turned, nowSeconds, reported)
         }
 
+        evaluatePatterns(nowSeconds)
         return true
     }
 
-    private fun raiseIf(kind: WarningKind, violating: Boolean, nowSeconds: Long, value: Float) {
-        if (!trackers.getValue(kind).update(violating, nowSeconds)) return
+    /**
+     * Chooses between the two ways of saying the phone was handled.
+     *
+     * One pick-up and a habit of picking it up are the same event seen at different scales,
+     * so they must not both fire: whichever applies is raised, and the other is marked as
+     * warned so it cannot follow a second later saying much the same thing.
+     */
+    private fun raiseMovement(violating: Boolean, nowSeconds: Long, value: Float) {
+        movementEvents.prune(nowSeconds)
+        val fidgeting = violating && PatternDetectors.isFidgeting(movementEvents)
+
+        if (fidgeting && trackers.getValue(WarningKind.FIDGETING).update(true, nowSeconds)) {
+            trackers.getValue(WarningKind.MOVEMENT).markWarned(nowSeconds)
+            Log.d(LOG_TAG, "EnvironmentMonitor warning=FIDGETING events=${movementEvents.size}")
+            _warnings.tryEmit(WarningKind.FIDGETING)
+            return
+        }
+
+        // Not fidgeting, or fidgeting is still in cooldown: fall back to the plain warning.
+        if (raiseIf(WarningKind.MOVEMENT, violating, nowSeconds, value) && fidgeting) {
+            trackers.getValue(WarningKind.FIDGETING).markWarned(nowSeconds)
+        }
+    }
+
+    /**
+     * Rules about how a condition is behaving rather than what it currently reads. These are
+     * judged every tick from their own windows, which is why they need no sustain of their
+     * own — the window *is* the sustain.
+     */
+    private fun evaluatePatterns(nowSeconds: Long) {
+        lightWindow.prune(nowSeconds)
+        noiseWindow.prune(nowSeconds)
+        movementEvents.prune(nowSeconds)
+
+        val swings = lightWindow.swings(EnvironmentThresholds.FLICKER_RELATIVE_CHANGE)
+        val spread = noiseWindow.spread()
+
+        // Kept for the history and the graphs whether or not they warranted a warning: a
+        // session spent in a slightly restless room is worth being able to see afterwards.
+        latest[SensorKind.LIGHT_VARIABILITY] = swings.toFloat()
+        latest[SensorKind.NOISE_VARIABILITY] = spread
+        latest[SensorKind.MOTION_EVENTS] = movementEvents.size.toFloat()
+
+        raiseIf(
+            WarningKind.FLICKERING_LIGHT,
+            PatternDetectors.isFlickering(lightWindow),
+            nowSeconds,
+            swings.toFloat(),
+        )
+        raiseIf(
+            WarningKind.RESTLESS_NOISE,
+            PatternDetectors.isRestless(noiseWindow),
+            nowSeconds,
+            spread,
+        )
+    }
+
+    private fun raiseIf(
+        kind: WarningKind,
+        violating: Boolean,
+        nowSeconds: Long,
+        value: Float,
+    ): Boolean {
+        if (!trackers.getValue(kind).update(violating, nowSeconds)) return false
 
         Log.d(LOG_TAG, "EnvironmentMonitor warning=$kind value=${value.roundToInt()}")
         _warnings.tryEmit(kind)
+        return true
     }
 
     /**
@@ -195,8 +298,14 @@ class EnvironmentMonitor @Inject constructor(
         val samples = latest.map { (kind, value) ->
             // Spiky signals are stored at their peak so the history shows that the phone was
             // moved, rather than whatever happened to be true at the instant of the write.
+            // The derived measures are already summaries of a window, so they are stored as
+            // computed.
             val stored = when (kind) {
-                SensorKind.LIGHT -> value
+                SensorKind.LIGHT,
+                SensorKind.LIGHT_VARIABILITY,
+                SensorKind.NOISE_VARIABILITY,
+                SensorKind.MOTION_EVENTS -> value
+
                 SensorKind.NOISE, SensorKind.MOTION, SensorKind.ROTATION ->
                     peakSinceSample[kind] ?: value
             }

@@ -31,8 +31,9 @@ class ActiveSessionViewModel @Inject constructor(
     private val _toasts = MutableStateFlow<List<ActiveToast>>(emptyList())
     val toasts = _toasts.asStateFlow()
 
-    private val _showBigWarning = MutableStateFlow(false)
-    val showBigWarning = _showBigWarning.asStateFlow()
+    /** Which full-screen warning is showing, or null. Its kind decides the wording. */
+    private val _bigWarning = MutableStateFlow<WarningKind?>(null)
+    val bigWarning = _bigWarning.asStateFlow()
 
     private var nextToastId = 0L
     private var bigWarningJob: Job? = null
@@ -40,8 +41,10 @@ class ActiveSessionViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             environmentMonitor.warnings.collect { kind ->
-                if (kind == WarningKind.MOVEMENT) {
-                    showBigWarning()
+                // Reaching for the phone is the failure the app exists to prevent, so both
+                // ways of saying it interrupt. Everything else advises quietly.
+                if (kind == WarningKind.MOVEMENT || kind == WarningKind.FIDGETING) {
+                    showBigWarning(kind)
                 } else {
                     showToast(kind)
                 }
@@ -56,12 +59,12 @@ class ActiveSessionViewModel @Inject constructor(
      * three minutes and turned the next two taps into the wrong actions entirely. So it now
      * clears itself, and a fresh warning restarts the clock rather than stacking.
      */
-    private fun showBigWarning() {
-        _showBigWarning.value = true
+    private fun showBigWarning(kind: WarningKind) {
+        _bigWarning.value = kind
         bigWarningJob?.cancel()
         bigWarningJob = viewModelScope.launch {
             delay(BIG_WARNING_VISIBLE_MILLIS)
-            _showBigWarning.value = false
+            _bigWarning.value = null
         }
     }
 
@@ -82,7 +85,7 @@ class ActiveSessionViewModel @Inject constructor(
     fun dismissBigWarning() {
         bigWarningJob?.cancel()
         bigWarningJob = null
-        _showBigWarning.value = false
+        _bigWarning.value = null
     }
 
     fun togglePause() = sessionEngine.togglePause()

@@ -162,6 +162,10 @@
     <string name="warning_loud_room">Your room is loud — can you concentrate?</string>
     <string name="warning_movement_toast">Phone movement detected.</string>
     <string name="warning_movement_big">Stop Using\nThe Phone!</string>
+    <string name="warning_flickering_light">The lighting keeps changing. A steady lamp is easier to read by.</string>
+    <string name="warning_restless_noise">Voices nearby — that\'s harder to tune out than steady noise.</string>
+    <string name="warning_fidgeting_toast">You keep reaching for your phone.</string>
+    <string name="warning_fidgeting_big">Put It Down\nAnd Leave It!</string>
     <string name="warning_tap_dismiss">Tap anywhere to dismiss</string>
     <string name="action_dismiss">Dismiss</string>
 

@@ -39,6 +39,29 @@ enum class SensorKind {
 
     /** Angular velocity magnitude, in rad/s. Turning a phone means holding it. */
     ROTATION,
+
+    /**
+     * Derived measures of how a condition is *behaving*, rather than what it reads.
+     *
+     * Stored as extra kinds in the same table rather than as new columns or a new table, for
+     * three reasons: `kind` is persisted as its own name in a TEXT column, so adding values
+     * needs no migration at all; every existing query, fraction and graph path works on them
+     * unchanged; and they are conceptually the same thing as the rest — a number sampled from
+     * the environment at a moment in time.
+     *
+     * They cannot be recomputed later from the stored raw samples, which is precisely why
+     * they are stored: a reading every ten seconds cannot show that a lamp flickered four
+     * times in between.
+     */
+
+    /** Number of large swings in ambient light over the recent window. */
+    LIGHT_VARIABILITY,
+
+    /** Loudest minus quietest reading over the recent window, in the same dB scale. */
+    NOISE_VARIABILITY,
+
+    /** Pick-ups detected in the last few minutes. */
+    MOTION_EVENTS,
 }
 
 /**

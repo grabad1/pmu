@@ -45,4 +45,16 @@ class ConditionTracker(
         violatingSince = null
         lastWarnedAt = null
     }
+
+    /**
+     * Starts this condition's cooldown without raising anything.
+     *
+     * Used when a different warning has just said much the same thing: one pick-up and a
+     * habit of picking the phone up are the same event at different scales, and hearing
+     * about both a second apart is worse than hearing about either.
+     */
+    fun markWarned(nowSeconds: Long) {
+        lastWarnedAt = nowSeconds
+        violatingSince = nowSeconds
+    }
 }

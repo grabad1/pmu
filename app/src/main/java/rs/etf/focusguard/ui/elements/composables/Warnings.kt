@@ -128,6 +128,7 @@ data class WarningToastData(val icon: String, val messageResId: Int)
  */
 @Composable
 fun BigWarningOverlay(
+    messageResId: Int,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -152,7 +153,7 @@ fun BigWarningOverlay(
         ) {
             Text(text = "🚫", fontSize = 72.sp, modifier = Modifier.scale(pulse))
             Text(
-                text = stringResource(R.string.warning_movement_big),
+                text = stringResource(messageResId),
                 fontSize = 28.sp,
                 lineHeight = 35.sp,
                 fontWeight = FontWeight.Black,
