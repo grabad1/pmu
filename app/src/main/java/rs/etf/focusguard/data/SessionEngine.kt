@@ -239,7 +239,8 @@ class SessionEngine @Inject constructor(
     private suspend fun rate(sessionId: Long) {
         val withPauses = repository.getSessionWithPauses(sessionId) ?: return
         val samples = repository.getSensorSamples(sessionId)
-        val summary = SessionSummary.from(withPauses, samples)
+        val interruptions = repository.getInterruptionCounts(sessionId)
+        val summary = SessionSummary.from(withPauses, samples, interruptions)
 
         // How this user's earlier sessions on the same topic went, so the comment can place
         // this one against their own history rather than judging it in isolation. Narrowest

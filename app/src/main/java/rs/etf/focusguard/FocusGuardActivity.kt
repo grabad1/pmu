@@ -31,9 +31,14 @@ class FocusGuardActivity : ComponentActivity() {
     }
 
     /**
-     * Notifications carry the session timer while the app is backgrounded, and the microphone
-     * drives loudness detection. Neither is required for the app to run — a denied microphone
-     * simply disables noise warnings — so the result is not acted upon.
+     * Notifications carry the session timer while the app is backgrounded, the microphone
+     * drives loudness detection, and the phone state tells a session when a call interrupted
+     * it. None is required for the app to run — a denied microphone simply disables noise
+     * warnings, a denied phone state means calls are not counted — so the result is not
+     * acted upon.
+     *
+     * Notification access is deliberately not here: it is a special access that cannot be
+     * requested with a dialog, so the home screen offers a card that opens Settings instead.
      */
     private fun askForPermissions() {
         val wanted = buildList {
@@ -41,6 +46,7 @@ class FocusGuardActivity : ComponentActivity() {
                 add(Manifest.permission.POST_NOTIFICATIONS)
             }
             add(Manifest.permission.RECORD_AUDIO)
+            add(Manifest.permission.READ_PHONE_STATE)
         }
 
         val missing = wanted.filter {

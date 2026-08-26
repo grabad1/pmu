@@ -22,6 +22,14 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!--
+      Calls and notifications from other apps are recorded during a session so the user can be
+      told which app kept interrupting them. READ_PHONE_STATE is a normal runtime permission;
+      notification access is a special access that cannot be requested with a dialog, so the
+      app asks for it with a card that opens the right Settings screen and works without it.
+    -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+
     <!-- The app degrades gracefully without any of these, so none is required. -->
     <uses-feature android:name="android.hardware.sensor.light" android:required="false" />
     <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />
@@ -55,6 +63,20 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Times a user-started focus session and watches the environment for conditions that break concentration. The session must keep running with the screen off, so it cannot be a short service." />
+        </service>
+
+        <!--
+          Bound by the system, not by the app, so it runs on Android's schedule rather than
+          only during a session — InterruptionRecorder decides what actually counts.
+        -->
+        <service
+            android:name=".interruptions.FocusGuardNotificationListener"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
         </service>
 
         <receiver

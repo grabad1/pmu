@@ -88,6 +88,15 @@
         <item quantity="other">%1$d pauses — tap to view ↗</item>
     </plurals>
     <string name="previous_card_footer">Tap card for AI analysis</string>
+
+    <!-- Interruptions -->
+    <string name="notification_access_title">Track interruptions</string>
+    <string name="notification_access_body">Allow notification access so a session can tell you which apps interrupted you. Tap to open Settings.</string>
+    <string name="detail_interruptions">Interruptions</string>
+    <plurals name="value_interruptions">
+        <item quantity="one">%1$d interruption</item>
+        <item quantity="other">%1$d interruptions</item>
+    </plurals>
     <string name="previous_empty">No finished sessions yet.\nStart one to see it here.</string>
     <string name="previous_empty_filtered">Nothing here yet.\nNo sessions match this filter.</string>
 

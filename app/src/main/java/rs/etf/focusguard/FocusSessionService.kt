@@ -24,6 +24,7 @@ import kotlinx.coroutines.launch
 import rs.etf.focusguard.data.SessionEngine
 import rs.etf.focusguard.data.SessionRuntimeState
 import rs.etf.focusguard.data.room.PauseType
+import rs.etf.focusguard.interruptions.CallLifecycleAwareMonitor
 import rs.etf.focusguard.sensors.AwayFromAppMonitor
 import rs.etf.focusguard.sensors.EnvironmentMonitor
 import rs.etf.focusguard.sensors.LightLifecycleAwareMonitor
@@ -85,6 +86,9 @@ class FocusSessionService : LifecycleService() {
     @Inject
     lateinit var awayMonitor: AwayFromAppMonitor
 
+    @Inject
+    lateinit var callMonitor: CallLifecycleAwareMonitor
+
     private var isObservingState = false
 
     /**
@@ -108,6 +112,7 @@ class FocusSessionService : LifecycleService() {
         // Not a sensor, but the same shape of problem: something to watch for while a session
         // runs, and to stop watching the moment it ends.
         lifecycle.addObserver(awayMonitor)
+        lifecycle.addObserver(callMonitor)
     }
 
     override fun onDestroy() {

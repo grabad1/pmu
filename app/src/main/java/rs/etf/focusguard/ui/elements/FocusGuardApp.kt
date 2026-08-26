@@ -66,6 +66,8 @@ fun FocusGuardApp(
     val runningSession by viewModel.runningSession.collectAsStateWithLifecycle()
     val dueSession by viewModel.dueSession.collectAsStateWithLifecycle()
     val finishedSession by viewModel.finishedSession.collectAsStateWithLifecycle()
+    val finishedSessionInterruptions by
+        viewModel.finishedSessionInterruptions.collectAsStateWithLifecycle()
     val currentEntry by navController.currentBackStackEntryAsState()
 
     // Reopening the app mid-session should land on the timer, not on Home.
@@ -168,6 +170,7 @@ fun FocusGuardApp(
         SessionResultDialog(
             session = session,
             onDismiss = viewModel::dismissFinishedSession,
+            interruptions = finishedSessionInterruptions,
         )
     }
 }

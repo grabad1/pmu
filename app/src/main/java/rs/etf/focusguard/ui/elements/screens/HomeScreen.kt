@@ -7,6 +7,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -25,17 +26,24 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import rs.etf.focusguard.R
+import rs.etf.focusguard.interruptions.FocusGuardNotificationListener
 import rs.etf.focusguard.ui.elements.composables.PrimaryButton
 import rs.etf.focusguard.ui.elements.composables.SecondaryButton
 import rs.etf.focusguard.ui.elements.theme.Accent
@@ -135,6 +143,58 @@ fun HomeScreen(
                     onClick = onPreviousSessions,
                 )
             }
+
+            NotificationAccessPrompt(modifier = Modifier.padding(top = 22.dp))
         }
+    }
+}
+
+/**
+ * Asks for notification access, which is what lets a session report which app interrupted it.
+ *
+ * Shown only while the access is missing, and it disappears as soon as it is granted — so a
+ * user who wants the feature is told how to get it, and one who does not is not nagged on
+ * every visit to the home screen. Everything else works without it.
+ *
+ * The state is re-read whenever the app comes back to the front, because the user grants it
+ * in Settings and returns; without that the card would still be sitting there.
+ */
+@Composable
+private fun NotificationAccessPrompt(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var granted by remember { mutableStateOf(FocusGuardNotificationListener.isEnabled(context)) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                granted = FocusGuardNotificationListener.isEnabled(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    if (granted) return
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(AccentDim, RoundedCornerShape(14.dp))
+            .border(1.dp, Accent, RoundedCornerShape(14.dp))
+            .clickable { context.startActivity(FocusGuardNotificationListener.settingsIntent()) }
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.notification_access_title),
+            style = MaterialTheme.typography.bodyMedium,
+            color = Accent,
+        )
+        Text(
+            text = stringResource(R.string.notification_access_body),
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary,
+        )
     }
 }

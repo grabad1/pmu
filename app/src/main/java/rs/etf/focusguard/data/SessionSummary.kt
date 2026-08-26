@@ -1,6 +1,7 @@
 package rs.etf.focusguard.data
 
 import rs.etf.focusguard.data.room.PauseType
+import rs.etf.focusguard.data.room.InterruptionCount
 import rs.etf.focusguard.data.room.SensorKind
 import rs.etf.focusguard.data.room.SensorSample
 import rs.etf.focusguard.data.room.Session
@@ -27,6 +28,8 @@ data class SessionSummary(
     val darkFraction: Double,
     val loudFraction: Double,
     val movementFraction: Double,
+    /** Calls and notifications from other apps, busiest app first. Never scored. */
+    val interruptions: List<InterruptionCount> = emptyList(),
 ) {
     /** For display and prompts; the score is computed from seconds. */
     val focusedMinutes: Int get() = focusedSeconds / 60
@@ -78,6 +81,37 @@ data class SessionSummary(
     val excessPlannedPauses: Int
         get() = (plannedPauseCount - reasonablePauseCount).coerceAtLeast(0)
 
+    val interruptionCount: Int get() = interruptions.sumOf { it.total }
+
+    val callCount: Int get() = interruptions.sumOf { it.calls }
+
+    /** The app responsible for the most interruptions, when one clearly stands out. */
+    val worstInterrupter: InterruptionCount?
+        get() = interruptions.maxByOrNull { it.total }?.takeIf { it.total >= 2 }
+
+    /**
+     * A suggestion, never a penalty.
+     *
+     * Interruptions are deliberately kept out of scoring: an incoming message is not a choice
+     * the user made, and the rubric already forgives a short interruption. What is useful is
+     * naming the culprit, because muting one app is a change someone can actually make.
+     *
+     * Silent below three, since being interrupted once or twice in a session is simply life.
+     */
+    val interruptionAdvice: String?
+        get() {
+            if (interruptionCount < 3) return null
+
+            val worst = worstInterrupter
+            return if (worst != null && worst.total * 2 >= interruptionCount) {
+                "${worst.appLabel} interrupted you ${worst.total} times — consider muting it " +
+                    "during your next session."
+            } else {
+                "You were interrupted $interruptionCount times by ${interruptions.size} " +
+                    "different apps. Do Not Disturb would keep the next session clear."
+            }
+        }
+
     companion object {
 
         /**
@@ -99,7 +133,11 @@ data class SessionSummary(
             }
         }
 
-        fun from(item: SessionWithPauses, samples: List<SensorSample>): SessionSummary {
+        fun from(
+            item: SessionWithPauses,
+            samples: List<SensorSample>,
+            interruptions: List<InterruptionCount> = emptyList(),
+        ): SessionSummary {
             val session: Session = item.session
             val unplanned = item.unplannedPauses
 
@@ -112,6 +150,7 @@ data class SessionSummary(
                 unplannedPauseCount = unplanned.size,
                 unplannedPauseSeconds = unplanned.sumOf { it.durationSeconds },
                 awaySeconds = session.awaySeconds,
+                interruptions = interruptions,
                 darkFraction = samples.fractionOf(SensorKind.LIGHT) {
                     it < EnvironmentThresholds.DARK_LUX
                 },

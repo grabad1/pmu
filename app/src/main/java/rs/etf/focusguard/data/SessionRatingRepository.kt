@@ -112,6 +112,32 @@ class SessionRatingRepository @Inject constructor(
                 "${(summary.awayShare * 100).roundToInt()}% of the focus time claimed"
         )
 
+        // Context, never a penalty. Stated as forcefully as possible, because a model given a
+        // list of interruptions will otherwise helpfully deduct for them and quietly disagree
+        // with the local rater, which does not score them at all.
+        if (summary.interruptions.isNotEmpty()) {
+            appendLine()
+            appendLine(
+                "Interruptions from outside the app, which the user did not choose and which " +
+                    "you must NOT reduce the score for under any circumstances:"
+            )
+            summary.interruptions.forEach { app ->
+                val parts = buildList {
+                    if (app.calls > 0) add("${app.calls} ${"call".pluralised(app.calls)}")
+                    if (app.notifications > 0) {
+                        add("${app.notifications} ${"notification".pluralised(app.notifications)}")
+                    }
+                }
+                appendLine("- ${app.appLabel}: ${parts.joinToString(", ")}")
+            }
+            appendLine(
+                "Mention them in the comment or analysis only if they are frequent enough to " +
+                    "be worth acting on — naming the worst offender and suggesting muting it " +
+                    "is useful advice. The score must be identical to what it would be if " +
+                    "none of these had happened."
+            )
+        }
+        appendLine()
         // Only offered once there is a real history to compare against: with one or two
         // sessions an "average" is barely more than this session repeated back.
         if (baseline != null && baseline.sessionCount >= 2) {

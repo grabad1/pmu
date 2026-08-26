@@ -56,6 +56,20 @@ class FocusGuardAppViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /**
+     * Which apps interrupted the session that just finished.
+     *
+     * Loaded once the session ends rather than tracked live: nothing acts on it during the
+     * session — deliberately, since interrupting the user to tell them they were interrupted
+     * would be absurd — so it is only needed when the result is shown.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val finishedSessionInterruptions = _finishedSessionId
+        .flatMapLatest { id ->
+            flow { emit(if (id == null) emptyList() else sessionRepository.getInterruptionCounts(id)) }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     init {
         viewModelScope.launch {
             sessionEngine.finishedSessions.collect { _finishedSessionId.value = it }

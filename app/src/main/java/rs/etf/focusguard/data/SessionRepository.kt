@@ -3,6 +3,9 @@ package rs.etf.focusguard.data
 import rs.etf.focusguard.data.room.Pause
 import rs.etf.focusguard.data.room.PauseDao
 import rs.etf.focusguard.data.room.PauseType
+import rs.etf.focusguard.data.room.Interruption
+import rs.etf.focusguard.data.room.InterruptionCount
+import rs.etf.focusguard.data.room.InterruptionDao
 import rs.etf.focusguard.data.room.SensorKind
 import rs.etf.focusguard.data.room.SensorSample
 import rs.etf.focusguard.data.room.SensorSampleDao
@@ -26,6 +29,7 @@ class SessionRepository @Inject constructor(
     private val sessionDao: SessionDao,
     private val pauseDao: PauseDao,
     private val sensorSampleDao: SensorSampleDao,
+    private val interruptionDao: InterruptionDao,
 ) {
 
     val scheduledSessions = sessionDao.getScheduledAsFlow()
@@ -100,6 +104,16 @@ class SessionRepository @Inject constructor(
         pauseDao.countByType(sessionId, type)
 
     suspend fun insertSensorSample(sample: SensorSample) = sensorSampleDao.insert(sample)
+
+    suspend fun insertInterruption(interruption: Interruption) =
+        interruptionDao.insert(interruption)
+
+    suspend fun getInterruptions(sessionId: Long): List<Interruption> =
+        interruptionDao.getBySession(sessionId)
+
+    /** Interruptions grouped by the app responsible, busiest first. */
+    suspend fun getInterruptionCounts(sessionId: Long): List<InterruptionCount> =
+        interruptionDao.countsByApp(sessionId)
 
     suspend fun insertSensorSamples(samples: List<SensorSample>) =
         sensorSampleDao.insertAll(samples)
