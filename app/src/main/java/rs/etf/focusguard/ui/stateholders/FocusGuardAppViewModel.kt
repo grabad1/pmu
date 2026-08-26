@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import rs.etf.focusguard.FocusSessionService
@@ -57,18 +58,18 @@ class FocusGuardAppViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /**
-     * Which apps interrupted the session that just finished.
+     * The finished session's full history, loaded once the session ends.
      *
-     * Loaded once the session ends rather than tracked live: nothing acts on it during the
-     * session — deliberately, since interrupting the user to tell them they were interrupted
-     * would be absurd — so it is only needed when the result is shown.
+     * Re-read whenever the session row changes, because the row changes when the rating
+     * lands, and the tabs should not go stale behind a score that has just arrived.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val finishedSessionInterruptions = _finishedSessionId
+    val finishedSessionDetail = _finishedSessionId
         .flatMapLatest { id ->
-            flow { emit(if (id == null) emptyList() else sessionRepository.getInterruptionCounts(id)) }
+            if (id == null) flowOf(null)
+            else sessionRepository.getSessionAsFlow(id).map { sessionRepository.getSessionDetail(id) }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     init {
         viewModelScope.launch {

@@ -115,6 +115,20 @@ class SessionRepository @Inject constructor(
     suspend fun getInterruptionCounts(sessionId: Long): List<InterruptionCount> =
         interruptionDao.countsByApp(sessionId)
 
+    /**
+     * Everything about one session, for the detail view. Loaded on demand because the sensor
+     * history is large and is not needed to draw a list.
+     */
+    suspend fun getSessionDetail(sessionId: Long): SessionDetail? {
+        val withPauses = sessionDao.getWithPauses(sessionId) ?: return null
+        return SessionDetail(
+            session = withPauses.session,
+            pauses = withPauses.pauses,
+            samples = sensorSampleDao.getBySession(sessionId),
+            interruptions = interruptionDao.countsByApp(sessionId),
+        )
+    }
+
     suspend fun insertSensorSamples(samples: List<SensorSample>) =
         sensorSampleDao.insertAll(samples)
 

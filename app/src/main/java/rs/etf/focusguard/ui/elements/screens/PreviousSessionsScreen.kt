@@ -58,6 +58,7 @@ fun PreviousSessionsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle(initialValue = emptyList())
     val topics by viewModel.topics.collectAsStateWithLifecycle(initialValue = emptyList())
+    val openDetail by viewModel.openDetail.collectAsStateWithLifecycle()
     val sessions = content.sessions
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -109,7 +110,13 @@ fun PreviousSessionsScreen(
 
     uiState.analysisSessionId
         ?.let { id -> sessions.firstOrNull { it.session.id == id } }
-        ?.let { item -> AnalysisDialog(item = item, onDismiss = viewModel::dismissDialogs) }
+        ?.let { item ->
+            AnalysisDialog(
+                item = item,
+                detail = openDetail,
+                onDismiss = viewModel::dismissDialogs,
+            )
+        }
 }
 
 /** Category chips, plus topic chips once a category is chosen. */

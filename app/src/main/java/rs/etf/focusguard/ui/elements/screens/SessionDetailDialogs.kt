@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import rs.etf.focusguard.R
+import rs.etf.focusguard.data.SessionDetail
 import rs.etf.focusguard.data.room.Pause
 import rs.etf.focusguard.data.room.PauseType
 import rs.etf.focusguard.data.room.SessionWithPauses
@@ -124,6 +125,7 @@ private fun LabelledValue(label: String, value: String, modifier: Modifier = Mod
 @Composable
 fun AnalysisDialog(
     item: SessionWithPauses,
+    detail: SessionDetail?,
     onDismiss: () -> Unit,
 ) {
     val session = item.session
@@ -136,13 +138,23 @@ fun AnalysisDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = session.name,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = TextPrimary,
-                    modifier = Modifier.weight(1f),
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = session.name,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = TextPrimary,
+                    )
+                    listOfNotNull(session.category, session.topic)
+                        .takeIf { it.isNotEmpty() }
+                        ?.let { labels ->
+                            Text(
+                                text = labels.joinToString(" · "),
+                                fontSize = 11.sp,
+                                color = TextSecondary,
+                            )
+                        }
+                }
                 Text(
                     text = session.focusScore?.toString() ?: "—",
                     fontSize = 30.sp,
@@ -159,19 +171,10 @@ fun AnalysisDialog(
             )
         },
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                text = session.aiComment ?: stringResource(R.string.analysis_pending_comment),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary,
-            )
-            Text(
-                text = session.aiAnalysis ?: stringResource(R.string.analysis_pending_detail),
-                fontSize = 12.sp,
-                lineHeight = 20.sp,
-                color = TextSecondary,
-            )
-        }
+        SessionDetailTabs(
+            comment = session.aiComment,
+            analysis = session.aiAnalysis,
+            detail = detail,
+        )
     }
 }

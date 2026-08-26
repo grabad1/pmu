@@ -11,13 +11,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import rs.etf.focusguard.R
-import rs.etf.focusguard.data.room.InterruptionCount
+import rs.etf.focusguard.data.SessionDetail
 import rs.etf.focusguard.data.room.Session
 import rs.etf.focusguard.ui.elements.composables.DialogButton
 import rs.etf.focusguard.ui.elements.composables.DialogButtonStyle
@@ -39,7 +38,7 @@ import rs.etf.focusguard.util.scoreColor
 fun SessionResultDialog(
     session: Session,
     onDismiss: () -> Unit,
-    interruptions: List<InterruptionCount> = emptyList(),
+    detail: SessionDetail? = null,
 ) {
     val rated = session.focusScore != null
 
@@ -99,42 +98,14 @@ fun SessionResultDialog(
                 color = TextSecondary,
             )
 
-            // Listed, never scored: a message arriving is not something the user did.
-            if (interruptions.isNotEmpty()) {
-                val total = interruptions.sumOf { it.total }
-                Text(
-                    text = pluralStringResource(R.plurals.value_interruptions, total, total) +
-                        " · " + interruptions.joinToString(", ") { "${it.appLabel} ×${it.total}" },
-                    fontSize = 12.sp,
-                    color = Accent,
-                )
-            }
-            if (rated) {
-                session.aiComment?.let { comment ->
-                    Text(
-                        text = comment,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                }
-                session.aiAnalysis?.let { analysis ->
-                    Text(
-                        text = analysis,
-                        fontSize = 12.sp,
-                        lineHeight = 20.sp,
-                        color = TextSecondary,
-                    )
-                }
-            } else {
-                Text(
-                    text = stringResource(R.string.result_dialog_analysing),
-                    fontSize = 12.sp,
-                    color = TextSecondary,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
+            SessionDetailTabs(
+                comment = session.aiComment,
+                analysis = session.aiAnalysis,
+                detail = detail,
+                // The rating is fetched over the network, so the dialog opens with the
+                // session's own figures and fills the verdict in when it lands.
+                pendingText = if (rated) null else stringResource(R.string.result_dialog_analysing),
+            )
         }
     }
 }

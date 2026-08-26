@@ -89,6 +89,41 @@
     </plurals>
     <string name="previous_card_footer">Tap card for AI analysis</string>
 
+    <!-- Session detail tabs -->
+    <string name="tab_analysis">AI</string>
+    <string name="tab_conditions">Conditions</string>
+    <string name="tab_interruptions">Interruptions</string>
+    <string name="detail_loading">Loading…</string>
+    <string name="conditions_too_short">This session was too short to chart. Sessions record the room every 10 seconds.</string>
+    <string name="chart_light">Light</string>
+    <string name="chart_light_threshold">Dashed line: below it the room counts as dark</string>
+    <string name="chart_noise">Noise</string>
+    <string name="chart_noise_threshold">Dashed line: above it the room counts as loud</string>
+    <string name="chart_motion">Phone movement</string>
+    <string name="chart_motion_threshold">Dashed line: above it the phone was being handled</string>
+    <string name="chart_light_variability">Light changes</string>
+    <string name="chart_light_variability_threshold">Dashed line: above it the lighting counts as flickering</string>
+    <string name="chart_noise_variability">Noise variability</string>
+    <string name="chart_noise_variability_threshold">Dashed line: above it the noise counts as restless</string>
+    <string name="chart_gap_note">Gaps in the lines are your breaks — the room is not measured while you are paused.</string>
+    <string name="share_dark">dark</string>
+    <string name="share_loud">loud</string>
+    <string name="share_moving">moving</string>
+    <plurals name="share_pick_ups">
+        <item quantity="one">Busiest five minutes: %1$d pick-up</item>
+        <item quantity="other">Busiest five minutes: %1$d pick-ups</item>
+    </plurals>
+    <string name="interruptions_none">Nothing interrupted this session.</string>
+    <string name="interruptions_not_scored">Interruptions are never counted against your score — you did not choose them. They are here so you know what to mute.</string>
+    <plurals name="interruption_calls">
+        <item quantity="one">%1$d call</item>
+        <item quantity="other">%1$d calls</item>
+    </plurals>
+    <plurals name="interruption_notifications">
+        <item quantity="one">%1$d notification</item>
+        <item quantity="other">%1$d notifications</item>
+    </plurals>
+
     <!-- Interruptions -->
     <string name="notification_access_title">Track interruptions</string>
     <string name="notification_access_body">Allow notification access so a session can tell you which apps interrupted you. Tap to open Settings.</string>

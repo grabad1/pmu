@@ -3,13 +3,18 @@ package rs.etf.focusguard.ui.stateholders
 import android.os.Parcelable
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
+import rs.etf.focusguard.data.SessionDetail
 import rs.etf.focusguard.data.SessionRepository
 import rs.etf.focusguard.data.TopicSummary
 import rs.etf.focusguard.data.room.SessionWithPauses
@@ -74,10 +79,32 @@ class PreviousSessionsViewModel @Inject constructor(
 
     fun showPauseLog(sessionId: Long) = update { it.copy(pauseLogSessionId = sessionId) }
 
-    fun showAnalysis(sessionId: Long) = update { it.copy(analysisSessionId = sessionId) }
+    fun showAnalysis(sessionId: Long) {
+        update { it.copy(analysisSessionId = sessionId) }
+        loadDetail(sessionId)
+    }
 
-    fun dismissDialogs() = update {
-        it.copy(pauseLogSessionId = null, analysisSessionId = null)
+    fun dismissDialogs() {
+        update { it.copy(pauseLogSessionId = null, analysisSessionId = null) }
+        _openDetail.value = null
+    }
+
+    /**
+     * The full history of the session currently open, loaded when it is opened.
+     *
+     * Kept out of the list itself: a session holds hundreds of sensor samples, and reading
+     * them for every card on screen in order to draw three of them would be waste.
+     */
+    private val _openDetail = MutableStateFlow<SessionDetail?>(null)
+    val openDetail = _openDetail.asStateFlow()
+
+    private fun loadDetail(sessionId: Long) {
+        _openDetail.value = null
+        viewModelScope.launch {
+            val detail = sessionRepository.getSessionDetail(sessionId)
+            // Ignore a load that finished after the user moved on to another session.
+            if (uiState.value.analysisSessionId == sessionId) _openDetail.value = detail
+        }
     }
 
     /**
