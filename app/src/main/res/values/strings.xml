@@ -151,6 +151,9 @@
     <string name="summary_dark">Dark %1$d%%</string>
     <string name="summary_loud">Loud %1$d%%</string>
     <string name="summary_moving">Moving %1$d%%</string>
+    <string name="summary_save_to_file">Save to File</string>
+    <string name="summary_saved_to">Saved to %1$s</string>
+    <string name="summary_save_failed">Could not write the file — storage is not available.</string>
 
     <!-- Pause log -->
     <string name="pause_log_title">Pause Log</string>

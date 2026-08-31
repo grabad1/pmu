@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import rs.etf.focusguard.R
+import rs.etf.focusguard.data.ExportResult
 import rs.etf.focusguard.data.TopicSummary
 import rs.etf.focusguard.data.room.SessionWithPauses
 import rs.etf.focusguard.ui.elements.composables.ChipRow
@@ -32,9 +33,11 @@ import rs.etf.focusguard.ui.elements.composables.DetailRow
 import rs.etf.focusguard.ui.elements.composables.EmptyState
 import rs.etf.focusguard.ui.elements.composables.FocusCard
 import rs.etf.focusguard.ui.elements.composables.ScreenHeader
+import rs.etf.focusguard.ui.elements.composables.SecondaryButton
 import rs.etf.focusguard.ui.elements.composables.SelectableChip
 import rs.etf.focusguard.ui.elements.theme.Accent
 import rs.etf.focusguard.ui.elements.theme.Border
+import rs.etf.focusguard.ui.elements.theme.Red
 import rs.etf.focusguard.ui.elements.theme.TextPrimary
 import rs.etf.focusguard.ui.elements.theme.TextSecondary
 import rs.etf.focusguard.ui.elements.theme.TextTertiary
@@ -59,6 +62,7 @@ fun PreviousSessionsScreen(
     val categories by viewModel.categories.collectAsStateWithLifecycle(initialValue = emptyList())
     val topics by viewModel.topics.collectAsStateWithLifecycle(initialValue = emptyList())
     val openDetail by viewModel.openDetail.collectAsStateWithLifecycle()
+    val exportResult by viewModel.exportResult.collectAsStateWithLifecycle()
     val sessions = content.sessions
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -91,7 +95,13 @@ fun PreviousSessionsScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 content.summary?.let { stats ->
-                    item(key = "summary") { TopicSummaryCard(summary = stats) }
+                    item(key = "summary") {
+                        TopicSummaryCard(
+                            summary = stats,
+                            exportResult = exportResult,
+                            onSaveClick = { viewModel.saveSummaryToFile(stats) },
+                        )
+                    }
                 }
                 items(items = sessions, key = { it.session.id }) { item ->
                     PreviousSessionCard(
@@ -166,10 +176,16 @@ private fun HistoryFilters(
  *
  * Percentages are only shown when there is something to say: a run of sessions with no bad
  * light should not display "Bad light 0%" three times over.
+ *
+ * The saved path is shown inline rather than in a snackbar. It is long, it is the whole point
+ * of pressing the button, and something to be read off a screen and typed into `adb pull`
+ * should not disappear after three seconds.
  */
 @Composable
 private fun TopicSummaryCard(
     summary: TopicSummary,
+    exportResult: ExportResult?,
+    onSaveClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     FocusCard(modifier = modifier) {
@@ -238,6 +254,32 @@ private fun TopicSummaryCard(
                     label = stringResource(R.string.summary_conditions),
                     value = conditions.joinToString("   ·   "),
                 )
+            }
+        }
+
+        Column(
+            modifier = Modifier.padding(top = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            SecondaryButton(
+                text = stringResource(R.string.summary_save_to_file),
+                onClick = onSaveClick,
+            )
+
+            when (exportResult) {
+                is ExportResult.Saved -> Text(
+                    text = stringResource(R.string.summary_saved_to, exportResult.path),
+                    fontSize = 10.sp,
+                    color = TextSecondary,
+                )
+
+                ExportResult.Failed -> Text(
+                    text = stringResource(R.string.summary_save_failed),
+                    fontSize = 11.sp,
+                    color = Red,
+                )
+
+                null -> Unit
             }
         }
     }

@@ -14,10 +14,15 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
+import rs.etf.focusguard.data.ExportResult
 import rs.etf.focusguard.data.SessionDetail
 import rs.etf.focusguard.data.SessionRepository
+import rs.etf.focusguard.data.SummaryFileExporter
 import rs.etf.focusguard.data.TopicSummary
 import rs.etf.focusguard.data.room.SessionWithPauses
+import rs.etf.focusguard.util.summaryReportFileName
+import rs.etf.focusguard.util.summaryReportText
+import java.time.LocalDateTime
 import javax.inject.Inject
 
 /** The finished sessions on screen and the averages that describe them, always in step. */
@@ -39,6 +44,7 @@ data class PreviousSessionsUiState(
 class PreviousSessionsViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
     private val sessionRepository: SessionRepository,
+    private val summaryFileExporter: SummaryFileExporter,
 ) : ViewModel() {
 
     companion object {
@@ -112,6 +118,7 @@ class PreviousSessionsViewModel @Inject constructor(
      * own category — keeping "Math" selected after switching to "Yoga" would show nothing.
      */
     fun onCategoryFilter(category: String?) = update {
+        _exportResult.value = null
         if (it.categoryFilter.equals(category, ignoreCase = true)) {
             it.copy(categoryFilter = null, topicFilter = null)
         } else {
@@ -120,10 +127,36 @@ class PreviousSessionsViewModel @Inject constructor(
     }
 
     fun onTopicFilter(topic: String?) = update {
+        _exportResult.value = null
         if (it.topicFilter.equals(topic, ignoreCase = true)) {
             it.copy(topicFilter = null)
         } else {
             it.copy(topicFilter = topic)
+        }
+    }
+
+    /**
+     * Where the last saved report went, or that it failed — kept out of [PreviousSessionsUiState]
+     * because it describes something that just happened rather than what the screen is showing,
+     * and restoring "Saved to …" after the process was killed would be a claim about a file the
+     * user never asked for again.
+     */
+    private val _exportResult = MutableStateFlow<ExportResult?>(null)
+    val exportResult = _exportResult.asStateFlow()
+
+    /**
+     * Writes the averages currently on screen to a text file.
+     *
+     * The summary is passed in rather than re-read, so the file says exactly what the card said
+     * when the button was pressed.
+     */
+    fun saveSummaryToFile(summary: TopicSummary) {
+        viewModelScope.launch {
+            val savedAt = LocalDateTime.now()
+            _exportResult.value = summaryFileExporter.save(
+                content = summaryReportText(summary, savedAt),
+                fileName = summaryReportFileName(summary, savedAt),
+            )
         }
     }
 
