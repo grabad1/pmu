@@ -41,8 +41,14 @@ object GeminiModule {
             // stored and the timer screen released, so the user never sees this delay — but
             // when it expired the score silently became the local one instead. Measured
             // replies took 16-26 seconds, so the old 20 lost roughly a third of them.
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
+            //
+            // Raised again to 120 after a demo recording lost its rating to a timeout on a
+            // slow connection: the round trip to the API was measured at ~500 ms, and a
+            // session in the same run was rated normally, so the reply had not failed — it
+            // was merely late. Waiting longer costs nothing at all here, and every expiry
+            // silently downgrades a real judgement to the local approximation.
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(120, TimeUnit.SECONDS)
             .build()
     }
 
